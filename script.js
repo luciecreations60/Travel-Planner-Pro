@@ -224,4 +224,51 @@ function importData(event) {
     reader.readAsText(file);
 }
 
+
 function exportPDF() { html2pdf().from(document.body).save('Itineraire.pdf'); }
+
+async function findRestaurants() {
+    // On récupère la position du marqueur de destination
+    if (!markers['end']) {
+        alert(currentLang === 'fr' ? "Veuillez d'abord choisir une destination." : "Please select a destination first.");
+        return;
+    }
+    const lat = markers['end'].getLatLng().lat;
+    const lng = markers['end'].getLatLng().lng;
+
+    // Requête Overpass : cherche les "amenity=restaurant" autour de ces coordonnées
+    const query = `[out:json];node["amenity"~"restaurant|cafe"](around:1500,${lat},${lng});out;`;
+    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.elements.length === 0) {
+            alert("Aucun restaurant trouvé à proximité.");
+            return;
+        }
+
+        // On prend les 5 premiers résultats et on les ajoute comme activités
+        data.elements.slice(0, 5).forEach(item => {
+            const name = item.tags.name || "Restaurant";
+            const cuisine = item.tags.cuisine ? ` (${item.tags.cuisine})` : "";
+            
+            tripData[activeDay].push({
+                id: Date.now() + Math.random(),
+                type: 'activ',
+                name: `🍴 ${name}${cuisine}`,
+                price: 0,
+                time: '12:00',
+                address: '',
+                bookingUrl: '',
+                notes: 'Trouvé via OpenStreetMap'
+            });
+        });
+
+        renderBlocks();
+        save();
+    } catch (error) {
+        console.error("Erreur Overpass:", error);
+    }
+}
