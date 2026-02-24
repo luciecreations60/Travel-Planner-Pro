@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Planner Pro</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✈️</text></svg>">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="hero">
+    <button class="lang-switch" onclick="toggleLang()">FR / EN</button>
+    <h1 id="txt-title">Explorez le monde ✈️</h1>
+    <p id="txt-subtitle">Créez votre itinéraire sur-mesure et maîtrisez chaque dépense</p>
+</div>
+
+<div class="search-bar">
+    <div style="position:relative; width:300px;"><label id="lbl-start">DÉPART</label><input type="text" id="cityStart" placeholder="Ville" oninput="handleSearch(this.value, 'start')"><div id="suggestionsStart" class="suggest-box"></div></div>
+    <div style="position:relative; width:300px;"><label id="lbl-end">ARRIVÉE</label><input type="text" id="cityEnd" placeholder="Ville" oninput="handleSearch(this.value, 'end')"><div id="suggestionsEnd" class="suggest-box"></div></div>
+    <div><label id="lbl-from">DU</label><input type="date" id="dateStart" onchange="initDates()"></div>
+    <div><label id="lbl-to">AU</label><input type="date" id="dateEnd" onchange="generateTimeline()"></div>
+    <div><label id="lbl-pax">VOYAGEURS</label>
+        <select id="pax" onchange="save()" style="width:60px">
+            <option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+        </select>
+    </div>
+    <div><label id="lbl-cur">DEVISE</label>
+        <select id="currency" onchange="save(); renderBlocks();" style="width:70px">
+            <option value="€">€</option><option value="$">$</option><option value="£">£</option><option value="¥">¥</option>
+        </select>
+    </div>
+</div>
+
+<div style="text-align: center; margin-bottom: 10px;">
+    <button onclick="toggleFocus()" class="btn-api" style="background: white; border-radius: 20px; padding: 5px 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <span id="focus-icon">🔼</span> <span id="focus-text">Masquer l'en-tête</span>
+    </button>
+</div>
+
+<div class="main-container">
+    <div class="column">
+        <div class="timeline scrollable" id="timelineArea"></div>
+    </div>
+    <div class="column">
+        <div class="workspace scrollable">
+            <h2 id="currentDayTitle" class="day-header">Jour 1</h2>
+            <div class="btn-group">
+                <button class="btn-main btn-vol" onclick="addBlock('vol')">✈️ + <span class="t-vol">Vol</span></button>
+                <button class="btn-main btn-hotel" onclick="addBlock('hotel')">🏨 + <span class="t-hotel">Hôtel</span></button>
+                <button class="btn-main btn-activ" onclick="addBlock('activ')">🎟️ + <span class="t-activ">Activité</span></button>
+            </div>
+            <div id="blocksList"></div>
+        </div>
+    </div>
+    <div class="column sidebar">
+        <div class="budget-card">
+            <span id="txt-total-lbl" style="opacity: 0.6; font-size: 0.8rem;">TOTAL DU VOYAGE</span>
+            <span id="totalLabel" class="total-price">0€</span>
+            <div style="margin-top:15px; padding-top:15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <span id="txt-budget-lbl" style="opacity: 0.6; font-size: 0.8rem;">Budget estimé :</span>
+                <input type="number" id="budgetMax" value="0" style="width:120px; background:none; border:none; color:white; font-weight:800; text-align:center; font-size:1.1rem;" oninput="saveAndRefresh()">
+                <span class="cur-symbol">€</span>
+            </div>
+            <p id="alertLimit" style="color:#f87171; display:none; font-weight:bold; margin-top:10px;">⚠️ Budget dépassé !</p>
+        </div>
+
+        <div class="budget-card recap-card" style="margin-top: 15px; background: white; color: var(--dark); padding: 15px;">
+            <h3 style="margin-top: 0; font-size: 1rem;" id="txt-recap-title">Récapitulatif</h3>
+            <div id="recap-list" style="text-align: left; font-size: 0.9rem;"></div>
+        </div>
+
+        <div id="map"></div>
+        
+        <button class="btn-api" style="background:var(--dark); color:white; padding:15px; border-radius:15px; width:100%; margin-top:10px;" onclick="exportPDF()" id="btn-pdf">📄 Télécharger en PDF</button>
+        
+        <div class="storage-tools" style="margin-top: 10px; display: flex; gap: 5px;">
+            <button class="btn-api" style="flex: 1; background: #ef4444; color: white; border: none;" onclick="clearAll()">🗑️ Reset</button>
+            <button class="btn-api" style="flex: 1; background: #10b981; color: white; border: none;" onclick="downloadData()">💾 Save</button>
+            <label class="btn-api" style="flex: 1; background: #3b82f6; color: white; border: none; text-align: center; cursor: pointer;">
+                📂 Load <input type="file" id="importFile" style="display:none" onchange="importData(event)">
+            </label>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
