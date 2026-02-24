@@ -271,4 +271,12 @@ async function findRestaurants() {
     } catch (error) {
         console.error("Erreur Overpass:", error);
     }
+
+    // Dans l'objet texts :
+fr: { ..., resto: "Resto", ... },
+en: { ..., resto: "Dining", ... }
+
+// Et en bas de la fonction :
+document.querySelectorAll('.t-resto').forEach(el => el.innerText = t.resto);
 }
+
