@@ -28,11 +28,13 @@ body { font-family: 'Poppins', sans-serif; background: var(--bg); color: var(--d
 .btn-vol { background: #6366f1; }
 .btn-hotel { background: #f59e0b; }
 .btn-activ { background: #ec4899; }
+.recap-dot.resto { background: #10b981; }
 
 .trip-block { background: white; border-radius: 20px; padding: 18px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border-left: 8px solid; }
 .block-vol { border-color: #6366f1; }
 .block-hotel { border-color: #f59e0b; }
 .block-activ { border-color: #ec4899; }
+.block-resto { border-color: #10b981; } 
 .block-main { display: flex; align-items: center; gap: 10px; }
 
 .btn-api { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 15px; cursor: pointer; font-size: 0.75rem; font-weight: 700; color: #1e40af; }
@@ -53,4 +55,5 @@ input, select { padding: 8px; border: 1px solid #e2e8f0; border-radius: 10px; fo
 .recap-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
 
 /* Focus Mode */
+
 .header-hidden .hero, .header-hidden .search-bar { display: none !important; }
