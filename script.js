@@ -4,21 +4,54 @@ let tripData = JSON.parse(localStorage.getItem('travelPlannerData')) || {};
 let map;
 let markers = {};
 
+// 1. INITIALISATION ET CARTE
 function initMap(center = [46, 2], zoom = 3) {
     if(map) map.remove();
     map = L.map('map').setView(center, zoom);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    
+    // On choisit le style de carte selon le mode sombre
+    const isDark = localStorage.getItem('darkMode') === 'true';
+    const tileUrl = isDark 
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+    L.tileLayer(tileUrl, {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
     }).addTo(map);
+
+    if(isDark) document.body.classList.add('dark-mode');
 }
 
 window.onload = () => {
     ['dateStart', 'dateEnd', 'cityStart', 'cityEnd', 'currency', 'budgetMax', 'pax'].forEach(f => { 
         if(localStorage.getItem(f)) document.getElementById(f).value = localStorage.getItem(f); 
     });
-    initMap(); applyLang(); generateTimeline(); restoreMapMarkers();
+    
+    initMap(); 
+    applyLang(); 
+    generateTimeline(); 
+    restoreMapMarkers();
 };
 
+// 2. GESTION DU MODE SOMBRE
+function toggleDarkMode() {
+    const body = document.body;
+    const isDark = body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', isDark);
+    
+    // On change le bouton (optionnel si tu as mis un ID 'dark-btn')
+    const btn = document.getElementById('dark-btn');
+    if(btn) btn.innerText = isDark ? "☀️" : "🌙";
+
+    // On recharge la couche de la carte pour qu'elle passe en sombre/clair
+    const tileUrl = isDark 
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    
+    L.tileLayer(tileUrl, { attribution: '&copy; CARTO' }).addTo(map);
+}
+
+// 3. SAUVEGARDE ET CALCULS
 function save() {
     localStorage.setItem('travelPlannerData', JSON.stringify(tripData));
     ['dateStart', 'dateEnd', 'cityStart', 'cityEnd', 'currency', 'budgetMax', 'pax'].forEach(f => {
@@ -30,6 +63,47 @@ function save() {
 
 function saveAndRefresh() { save(); updateTotal(); }
 
+function updateTotal() { 
+    let total = 0; 
+    let stats = { vol: 0, hotel: 0, activ: 0, resto: 0 };
+    const cur = document.getElementById('currency').value;
+
+    Object.values(tripData).forEach(dayBlocks => {
+        dayBlocks.forEach(b => {
+            let p = parseFloat(b.price) || 0;
+            total += p;
+            if(stats[b.type] !== undefined) stats[b.type] += p;
+        });
+    });
+
+    const totalEl = document.getElementById('totalLabel');
+    const budgetMax = parseFloat(document.getElementById('budgetMax').value) || 0; 
+    const alertEl = document.getElementById('alertLimit'); 
+    
+    totalEl.innerText = total.toFixed(2) + cur; 
+    
+    if (budgetMax > 0 && total > budgetMax) { 
+        totalEl.style.color = "#f87171"; 
+        if(alertEl) alertEl.style.display = "block"; 
+    } else { 
+        totalEl.style.color = "white"; 
+        if(alertEl) alertEl.style.display = "none"; 
+    } 
+
+    const recapList = document.getElementById('recap-list');
+    const labels = currentLang === 'fr' 
+        ? { vol: 'Vols', hotel: 'Hébergements', activ: 'Activités', resto: 'Restaurants' } 
+        : { vol: 'Flights', hotel: 'Stays', activ: 'Activities', resto: 'Dining' };
+
+    recapList.innerHTML = `
+        <div class="recap-item"><small><span class="recap-dot" style="background:#6366f1"></span>${labels.vol}</small> <span>${stats.vol}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:#f59e0b"></span>${labels.hotel}</small> <span>${stats.hotel}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:#ec4899"></span>${labels.activ}</small> <span>${stats.activ}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:#10b981"></span>${labels.resto}</small> <span>${stats.resto}${cur}</span></div>
+    `;
+}
+
+// 4. TIMELINE ET BLOCS
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -52,53 +126,31 @@ function generateTimeline() {
     updateDayTitle(); renderBlocks(); save();
 }
 
-function searchAPI(type, query) {
-    const dest = document.getElementById('cityEnd').value.split(',')[0] || "Destination";
-    const startDateStr = document.getElementById('dateStart').value;
-    const travelers = document.getElementById('pax').value;
-    if (type === 'hotel') {
-        let checkin = startDateStr || new Date().toISOString().split('T')[0];
-        let d = new Date(checkin); d.setDate(d.getDate() + 1);
-        let checkout = d.toISOString().split('T')[0];
-        const q = encodeURIComponent(query || dest);
-        window.open(`https://www.booking.com/searchresults.fr.html?ss=${q}&ssne=${q}&ssne_untouched=${q}&checkin=${checkin}&checkout=${checkout}&group_adults=${travelers}`, '_blank');
-    } else {
-        window.open(`https://www.skyscanner.fr/transport/vols/${encodeURIComponent(query || 'CDG')}/`, '_blank');
-    }
-}
-
-function toggleLang() {
-    currentLang = currentLang === 'fr' ? 'en' : 'fr';
-    applyLang(); generateTimeline(); save();
-}
-
-function initDates() { const start = document.getElementById('dateStart').value; if(start) { let next = new Date(start); next.setDate(next.getDate() + 1); document.getElementById('dateEnd').value = next.toISOString().split('T')[0]; generateTimeline(); } }
-function updateDayTitle() { document.getElementById('currentDayTitle').innerText = (currentLang === 'fr' ? 'Jour ' : 'Day ') + activeDay; }
-function addBlock(type) { tripData[activeDay].push({ id: Date.now(), type, name: '', price: 0, time: '00:00', address: '', bookingUrl: '', notes: '' }); renderBlocks(); save(); }
-async function restoreMapMarkers() { const start = document.getElementById('cityStart').value; const end = document.getElementById('cityEnd').value; if(start) placeMarker(start, 'start'); if(end) placeMarker(end, 'end'); }
-
-async function placeMarker(query, type) { 
-    try { 
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&accept-language=${currentLang}&q=${encodeURIComponent(query)}&limit=1`); 
-        const data = await res.json(); 
-        if(data.length > 0) { 
-            if(markers[type]) map.removeLayer(markers[type]); 
-            markers[type] = L.marker([data[0].lat, data[0].lon]).addTo(map).bindPopup(query); 
-            map.flyTo([data[0].lat, data[0].lon], type === 'hotel' ? 14 : 6); 
-        } 
-    } catch(e) {} 
+function addBlock(type) { 
+    tripData[activeDay].push({ id: Date.now(), type, name: '', price: 0, time: '00:00', address: '', bookingUrl: '', notes: '' }); 
+    renderBlocks(); 
+    save(); 
 }
 
 function renderBlocks() { 
     const list = document.getElementById('blocksList'); 
     list.innerHTML = ""; 
     const cur = document.getElementById('currency').value; 
-    document.querySelectorAll('.cur-symbol').forEach(el => el.innerText = cur); 
     (tripData[activeDay] || []).sort((a,b) => a.time.localeCompare(b.time)).forEach(b => { 
         let div = document.createElement('div'); 
         div.className = `trip-block block-${b.type}`; 
-        let extra = b.type === 'hotel' ? `<div class="hotel-extra-fields"><div class="full-width"><input type="text" placeholder="Lien" value="${b.bookingUrl || ''}" onchange="updateB(${b.id}, 'bookingUrl', this.value)"></div><div><input type="text" placeholder="Adresse" value="${b.address || ''}" onchange="updateB(${b.id}, 'address', this.value)"></div><div><input type="text" placeholder="Notes" value="${b.notes || ''}" onchange="updateB(${b.id}, 'notes', this.value)"></div></div>` : ''; 
-        div.innerHTML = `<div class="block-main"><input type="time" class="time-input" value="${b.time}" onchange="updateB(${b.id}, 'time', this.value)"><div style="font-size:1.3rem">${b.type==='vol'?'✈️':b.type==='hotel'?'🏨':'🎟️'}</div><input type="text" style="flex:1; font-weight:bold;" placeholder="Nom" value="${b.name}" onchange="updateB(${b.id}, 'name', this.value)"><input type="number" class="price-input" value="${b.price}" oninput="updateB(${b.id}, 'price', this.value)">${cur}<button class="btn-api" onclick="searchAPI('${b.type}', '${b.name}')">🔍 ${currentLang === 'fr' ? 'Chercher' : 'Search'}</button><button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer; color:#cbd5e1; font-size:1.2rem;">✕</button></div>${extra}`; 
+        let icon = b.type==='vol'?'✈️':b.type==='hotel'?'🏨':b.type==='resto'?'🍴':'🎟️';
+        
+        let extra = b.type === 'hotel' ? `<div style="margin-top:10px; display:grid; gap:5px;"><input type="text" placeholder="Lien Booking" value="${b.bookingUrl || ''}" onchange="updateB(${b.id}, 'bookingUrl', this.value)"><input type="text" placeholder="Adresse" value="${b.address || ''}" onchange="updateB(${b.id}, 'address', this.value)"></div>` : ''; 
+
+        div.innerHTML = `
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="time" style="width:80px" value="${b.time}" onchange="updateB(${b.id}, 'time', this.value)">
+                <div style="font-size:1.2rem">${icon}</div>
+                <input type="text" style="flex:1; font-weight:bold;" value="${b.name}" onchange="updateB(${b.id}, 'name', this.value)">
+                <input type="number" style="width:70px" value="${b.price}" oninput="updateB(${b.id}, 'price', this.value)">${cur}
+                <button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer;">✕</button>
+            </div>${extra}`; 
         list.appendChild(div); 
     }); 
     updateTotal(); 
@@ -108,52 +160,76 @@ async function updateB(id, f, v) {
     let block = tripData[activeDay].find(x => x.id === id); 
     if(!block) return; 
     block[f] = f === 'price' ? parseFloat(v) : v; 
-    if(f === 'bookingUrl' && v.includes('booking.com')) { 
-        try { 
-            const url = new URL(v); 
-            let path = url.pathname.split('/'); 
-            let hotelPart = path[path.length - 1].replace('.fr.html', '').replace('.html', '').split('?')[0]; 
-            if (hotelPart) block.name = hotelPart.split('-').filter(w => !['hotel','fr','en'].includes(w)).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); 
-            let city = url.searchParams.get('ss') || document.getElementById('cityEnd').value; 
-            if(block.name) placeMarker(block.name + ', ' + city, 'hotel'); 
-            renderBlocks(); 
-        } catch(e) {} 
-    } 
     if(f === 'time') renderBlocks(); 
     save(); 
 }
 
-function updateTotal() { 
-    let total = 0; 
-    let stats = { vol: 0, hotel: 0, activ: 0, resto: 0 }; // Ajout de resto
-    const cur = document.getElementById('currency').value;
+// 5. RECHERCHE RESTAURANTS
+async function findRestaurants(filter = 'all') {
+    if (!markers['end']) {
+        alert(currentLang === 'fr' ? "Choisissez d'abord une destination." : "Please select a destination first.");
+        return;
+    }
+    const resultsDiv = document.getElementById('resto-results');
+    const listDiv = document.getElementById('resto-list');
+    const lat = markers['end'].getLatLng().lat;
+    const lng = markers['end'].getLatLng().lng;
 
-    Object.values(tripData).forEach(dayBlocks => {
-        dayBlocks.forEach(b => {
-            let p = parseFloat(b.price) || 0;
-            total += p;
-            if(stats[b.type] !== undefined) stats[b.type] += p;
+    listDiv.innerHTML = `<div style="display:flex; align-items:center; padding:20px;"><div class="spinner"></div> ${currentLang === 'fr' ? 'Recherche...' : 'Searching...'}</div>`;
+    resultsDiv.style.display = 'block';
+
+    let amenityType = 'restaurant|cafe';
+    let cuisineFilter = filter !== 'all' ? `["cuisine"~"${filter}"]` : '';
+
+    const query = `[out:json];node["amenity"~"${amenityType}"]${cuisineFilter}(around:2000,${lat},${lng});out;`;
+    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        listDiv.innerHTML = "";
+
+        if (data.elements.length === 0) {
+            listDiv.innerHTML = `<p style="padding:10px; font-size:0.8rem;">Aucun résultat.</p>`;
+            return;
+        }
+
+        data.elements.slice(0, 8).forEach(item => {
+            const name = item.tags.name || "Restaurant";
+            const cuisine = item.tags.cuisine || "";
+            const btn = document.createElement('button');
+            btn.className = "btn-api";
+            btn.style = "text-align:left; background:var(--card-bg); width:100%; margin-bottom:5px; justify-content:space-between;";
+            btn.innerHTML = `<span><strong>${name}</strong><br><small>${cuisine}</small></span><span>+</span>`;
+            btn.onclick = () => {
+                addRestoToTrip(name, cuisine);
+                btn.innerHTML = "✅";
+                btn.disabled = true;
+            };
+            listDiv.appendChild(btn);
         });
-    });
-
-    // ... (garde le code pour l'alerte budget) ...
-
-    const recapList = document.getElementById('recap-list');
-    const labels = currentLang === 'fr' 
-        ? { vol: 'Vols', hotel: 'Hébergements', activ: 'Activités', resto: 'Restaurants' } 
-        : { vol: 'Flights', hotel: 'Stays', activ: 'Activities', resto: 'Dining' };
-
-    recapList.innerHTML = `
-        <div class="recap-item"><small><span class="recap-dot" style="background:#6366f1"></span>${labels.vol}</small> <span>${stats.vol}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#f59e0b"></span>${labels.hotel}</small> <span>${stats.hotel}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#ec4899"></span>${labels.activ}</small> <span>${stats.activ}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#10b981"></span>${labels.resto}</small> <span>${stats.resto}${cur}</span></div>
-    `;
+    } catch (e) { listDiv.innerHTML = "Erreur réseau."; }
 }
 
+function addRestoToTrip(name, cuisine) {
+    tripData[activeDay].push({
+        id: Date.now(),
+        type: 'resto',
+        name: `🍴 ${name}`,
+        price: 0,
+        time: '12:30',
+        address: '',
+        bookingUrl: '',
+        notes: cuisine || ''
+    });
+    renderBlocks();
+    save();
+}
+
+// 6. RECHERCHE VILLES ET UTILES
 async function handleSearch(q, type) { 
     const sugg = document.getElementById(type === 'start' ? 'suggestionsStart' : 'suggestionsEnd'); 
-    if(q.length < 3) return; 
+    if(q.length < 3) { sugg.style.display = 'none'; return; }
     const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&accept-language=${currentLang}&q=${q}&limit=3`); 
     const data = await res.json(); 
     sugg.innerHTML = ""; 
@@ -168,12 +244,31 @@ async function handleSearch(q, type) {
     sugg.style.display = 'block'; 
 }
 
+async function placeMarker(query, type) { 
+    try { 
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`); 
+        const data = await res.json(); 
+        if(data.length > 0) { 
+            if(markers[type]) map.removeLayer(markers[type]); 
+            markers[type] = L.marker([data[0].lat, data[0].lon]).addTo(map).bindPopup(query); 
+            map.flyTo([data[0].lat, data[0].lon], type === 'end' ? 12 : 6); 
+        } 
+    } catch(e) {} 
+}
+
+async function restoreMapMarkers() { 
+    const start = document.getElementById('cityStart').value; 
+    const end = document.getElementById('cityEnd').value; 
+    if(start) placeMarker(start, 'start'); 
+    if(end) placeMarker(end, 'end'); 
+}
+
 function delB(id) { tripData[activeDay] = tripData[activeDay].filter(x => x.id !== id); renderBlocks(); save(); }
 
 function applyLang() { 
     const texts = { 
-        fr: { title: "Explorez le monde ✈️", subtitle: "Créez votre itinéraire sur-mesure et maîtrisez chaque dépense", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL DU VOYAGE", budget: "Budget estimé :", pdf: "📄 Télécharger en PDF", vol: "Vol", hotel: "Hôtel", activ: "Activité", resto: "Restaurant", alert: "⚠️ Budget dépassé !", pax: "VOYAGEURS" }, 
-        en: { title: "Explore the World ✈️", subtitle: "Create your custom itinerary and master every expense", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TRIP TOTAL", budget: "Estimated budget:", pdf: "📄 Download PDF", vol: "Flight", hotel: "Hotel", activ: "Activity", resto: "Dining", alert: "⚠️ Budget exceeded!", pax: "TRAVELERS" } 
+        fr: { title: "Explorez le monde ✈️", subtitle: "Préparez votre itinéraire sur-mesure", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL", budget: "Budget :", pdf: "📄 PDF", vol: "Vol", hotel: "Hôtel", activ: "Activité", resto: "Resto", pax: "VOYAGEURS" }, 
+        en: { title: "Explore the World ✈️", subtitle: "Plan your custom itinerary", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TOTAL", budget: "Budget:", pdf: "📄 PDF", vol: "Flight", hotel: "Hotel", activ: "Activity", resto: "Dining", pax: "TRAVELERS" } 
     }; 
     const t = texts[currentLang]; 
     document.getElementById('txt-title').innerText = t.title; 
@@ -187,7 +282,6 @@ function applyLang() {
     document.getElementById('txt-total-lbl').innerText = t.total; 
     document.getElementById('txt-budget-lbl').innerText = t.budget; 
     document.getElementById('btn-pdf').innerText = t.pdf; 
-    document.getElementById('alertLimit').innerText = t.alert; 
     document.querySelectorAll('.t-vol').forEach(el => el.innerText = t.vol); 
     document.querySelectorAll('.t-hotel').forEach(el => el.innerText = t.hotel); 
     document.querySelectorAll('.t-activ').forEach(el => el.innerText = t.activ); 
@@ -198,91 +292,9 @@ function applyLang() {
 function toggleFocus() {
     const isHidden = document.body.classList.toggle('header-hidden');
     const icon = document.getElementById('focus-icon');
-    const text = document.getElementById('focus-text');
     icon.innerText = isHidden ? "🔽" : "🔼";
-    text.innerText = isHidden ? (currentLang === 'fr' ? "Afficher l'en-tête" : "Show Header") : (currentLang === 'fr' ? "Masquer l'en-tête" : "Hide Header");
     setTimeout(() => { map.invalidateSize(); }, 300);
 }
 
-function clearAll() { if(confirm(currentLang === 'fr' ? "Tout effacer ?" : "Clear all?")) { localStorage.clear(); location.reload(); } }
-
-function downloadData() {
-    const data = { tripData, settings: { cityStart: document.getElementById('cityStart').value, cityEnd: document.getElementById('cityEnd').value, dateStart: document.getElementById('dateStart').value, dateEnd: document.getElementById('dateEnd').value, budgetMax: document.getElementById('budgetMax').value, currency: document.getElementById('currency').value, pax: document.getElementById('pax').value } };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `Voyage.json`; a.click();
-}
-
-function importData(event) {
-    const file = event.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const imported = JSON.parse(e.target.result);
-            tripData = imported.tripData;
-            Object.keys(imported.settings).forEach(key => { if(document.getElementById(key)) document.getElementById(key).value = imported.settings[key]; });
-            save(); location.reload();
-        } catch (err) { alert("Erreur."); }
-    };
-    reader.readAsText(file);
-}
-
-
+function clearAll() { if(confirm("Tout effacer ?")) { localStorage.clear(); location.reload(); } }
 function exportPDF() { html2pdf().from(document.body).save('Itineraire.pdf'); }
-
-async function findRestaurants() {
-    if (!markers['end']) {
-        alert(currentLang === 'fr' ? "Choisissez d'abord une destination." : "Please select a destination first.");
-        return;
-    }
-    
-    const resultsDiv = document.getElementById('resto-results');
-    const listDiv = document.getElementById('resto-list');
-    const lat = markers['end'].getLatLng().lat;
-    const lng = markers['end'].getLatLng().lng;
-
-    // Affichage du chargement avec le spinner
-    listDiv.innerHTML = `
-        <div style="display:flex; align-items:center; padding:20px; color:#065f46;">
-            <div class="spinner"></div> 
-            ${currentLang === 'fr' ? 'Recherche des meilleures tables...' : 'Finding best places...'}
-        </div>`;
-    resultsDiv.style.display = 'block';
-
-    const query = `[out:json];node["amenity"~"restaurant|cafe"](around:2000,${lat},${lng});out;`;
-    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-        listDiv.innerHTML = ""; // On efface le spinner
-
-        if (data.elements.length === 0) {
-            listDiv.innerHTML = "<p style='padding:10px;'>Aucun établissement trouvé dans cette zone.</p>";
-            return;
-        }
-
-        data.elements.slice(0, 8).forEach(item => {
-            const name = item.tags.name || "Restaurant";
-            const cuisine = item.tags.cuisine ? ` • ${item.tags.cuisine}` : "";
-            
-            const btn = document.createElement('button');
-            btn.className = "btn-api";
-            btn.style = "text-align:left; background:white; display:flex; justify-content:space-between; align-items:center; padding:12px; margin-bottom:5px; border:1px solid #d1fae5; width:100%; transition: 0.2s;";
-            btn.innerHTML = `
-                <span><strong>${name}</strong><br><small style="color:#6b7280">${cuisine}</small></span>
-                <span style="color:#10b981; font-weight:bold;">+ Ajouter</span>
-            `;
-            
-            btn.onclick = () => {
-                addRestoToTrip(name, item.tags.cuisine);
-                btn.style.background = "#f0fdf4";
-                btn.innerHTML = "✅ Ajouté";
-                btn.disabled = true;
-            };
-            listDiv.appendChild(btn);
-        });
-    } catch (e) {
-        listDiv.innerHTML = "<p style='color:red; padding:10px;'>Erreur de connexion aux données OpenStreetMap.</p>";
-    }
-}
