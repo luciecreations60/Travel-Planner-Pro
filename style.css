@@ -57,3 +57,16 @@ input, select { padding: 8px; border: 1px solid #e2e8f0; border-radius: 10px; fo
 /* Focus Mode */
 
 .header-hidden .hero, .header-hidden .search-bar { display: none !important; }
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(16, 185, 129, 0.3);
+    border-radius: 50%;
+    border-top-color: #10b981;
+    animation: spin 1s ease-in-out infinite;
+    display: inline-block;
+    margin-right: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
