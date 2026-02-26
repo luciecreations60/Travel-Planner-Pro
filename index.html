@@ -59,6 +59,21 @@
         <h4 style="margin:0; color:#065f46;">🍴 Suggestions à proximité</h4>
         <button onclick="document.getElementById('resto-results').style.display='none'" style="border:none; background:none; cursor:pointer;">✕</button>
     </div>
+    <div id="resto-results" style="display:none; background:#ecfdf5; border:1px solid #10b981; border-radius:15px; padding:15px; margin-bottom:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h4 style="margin:0; color:#065f46;">🍴 Suggestions</h4>
+        <button onclick="document.getElementById('resto-results').style.display='none'" style="border:none; background:none; cursor:pointer;">✕</button>
+    </div>
+    
+    <div id="resto-filters" style="display:flex; gap:5px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px;">
+        <button class="btn-api" onclick="findRestaurants('all')" style="background:#10b981; color:white;">Tous</button>
+        <button class="btn-api" onclick="findRestaurants('pizza|italian')">🇮🇹 Italien</button>
+        <button class="btn-api" onclick="findRestaurants('burger|fast_food')">🍔 Fast-Food</button>
+        <button class="btn-api" onclick="findRestaurants('cafe|bakery')">☕ Café</button>
+    </div>
+
+    <div id="resto-list" style="display:grid; gap:8px;"></div>
+</div>              
     <div id="resto-list" style="display:grid; gap:8px;"></div>
 </div>
                 
@@ -102,5 +117,6 @@
 </body>
 
 </html>
+
 
 
