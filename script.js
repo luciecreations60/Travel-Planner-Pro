@@ -232,75 +232,57 @@ function exportPDF() { html2pdf().from(document.body).save('Itineraire.pdf'); }
 
 async function findRestaurants() {
     if (!markers['end']) {
-        alert(currentLang === 'fr' ? "Choisissez d'abord une destination sur la carte." : "Please select a destination first.");
+        alert(currentLang === 'fr' ? "Choisissez d'abord une destination." : "Please select a destination first.");
         return;
     }
     
-    const lat = markers['end'].getLatLng().lat;
-    const lng = markers['end'].getLatLng().lng;
     const resultsDiv = document.getElementById('resto-results');
     const listDiv = document.getElementById('resto-list');
+    const lat = markers['end'].getLatLng().lat;
+    const lng = markers['end'].getLatLng().lng;
 
-    // Requête Overpass
+    // Affichage du chargement avec le spinner
+    listDiv.innerHTML = `
+        <div style="display:flex; align-items:center; padding:20px; color:#065f46;">
+            <div class="spinner"></div> 
+            ${currentLang === 'fr' ? 'Recherche des meilleures tables...' : 'Finding best places...'}
+        </div>`;
+    resultsDiv.style.display = 'block';
+
     const query = `[out:json];node["amenity"~"restaurant|cafe"](around:2000,${lat},${lng});out;`;
     const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-
-    listDiv.innerHTML = currentLang === 'fr' ? "Recherche en cours..." : "Searching...";
-    resultsDiv.style.display = 'block';
 
     try {
         const response = await fetch(url);
         const data = await response.json();
-        listDiv.innerHTML = "";
+        listDiv.innerHTML = ""; // On efface le spinner
 
         if (data.elements.length === 0) {
-            listDiv.innerHTML = "Aucun restaurant trouvé.";
+            listDiv.innerHTML = "<p style='padding:10px;'>Aucun établissement trouvé dans cette zone.</p>";
             return;
         }
 
-        // On affiche les 8 meilleures options
         data.elements.slice(0, 8).forEach(item => {
             const name = item.tags.name || "Restaurant";
             const cuisine = item.tags.cuisine ? ` • ${item.tags.cuisine}` : "";
             
             const btn = document.createElement('button');
             btn.className = "btn-api";
-            btn.style = "text-align:left; background:white; display:flex; justify-content:space-between; align-items:center; padding:10px;";
+            btn.style = "text-align:left; background:white; display:flex; justify-content:space-between; align-items:center; padding:12px; margin-bottom:5px; border:1px solid #d1fae5; width:100%; transition: 0.2s;";
             btn.innerHTML = `
-                <span><strong>${name}</strong><br><small style="opacity:0.7">${cuisine}</small></span>
+                <span><strong>${name}</strong><br><small style="color:#6b7280">${cuisine}</small></span>
                 <span style="color:#10b981; font-weight:bold;">+ Ajouter</span>
             `;
             
             btn.onclick = () => {
                 addRestoToTrip(name, item.tags.cuisine);
-                btn.style.opacity = "0.5";
+                btn.style.background = "#f0fdf4";
+                btn.innerHTML = "✅ Ajouté";
                 btn.disabled = true;
             };
-            
             listDiv.appendChild(btn);
         });
     } catch (e) {
-        listDiv.innerHTML = "Erreur de connexion.";
+        listDiv.innerHTML = "<p style='color:red; padding:10px;'>Erreur de connexion aux données OpenStreetMap.</p>";
     }
 }
-
-// Fonction pour ajouter le resto sélectionné dans l'itinéraire
-function addRestoToTrip(name, cuisine) {
-    const cuisineText = cuisine ? ` (${cuisine})` : "";
-    tripData[activeDay].push({
-        id: Date.now(),
-        type: 'resto',
-        name: `🍴 ${name}${cuisineText}`,
-        price: 0,
-        time: '12:30',
-        address: '',
-        bookingUrl: '',
-        notes: ''
-    });
-    renderBlocks();
-    save();
-}
-
-
-
-
