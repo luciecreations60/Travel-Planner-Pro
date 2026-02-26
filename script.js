@@ -125,8 +125,9 @@ async function updateB(id, f, v) {
 
 function updateTotal() { 
     let total = 0; 
-    let stats = { vol: 0, hotel: 0, activ: 0 };
+    let stats = { vol: 0, hotel: 0, activ: 0, resto: 0 }; // Ajout de resto
     const cur = document.getElementById('currency').value;
+
     Object.values(tripData).forEach(dayBlocks => {
         dayBlocks.forEach(b => {
             let p = parseFloat(b.price) || 0;
@@ -134,18 +135,19 @@ function updateTotal() {
             if(stats[b.type] !== undefined) stats[b.type] += p;
         });
     });
-    const totalEl = document.getElementById('totalLabel');
-    const budgetMax = parseFloat(document.getElementById('budgetMax').value) || 0; 
-    const alertEl = document.getElementById('alertLimit'); 
-    totalEl.innerText = total.toFixed(2) + cur; 
-    if (budgetMax > 0 && total > budgetMax) { totalEl.style.color = "#f87171"; alertEl.style.display = "block"; } 
-    else { totalEl.style.color = "var(--accent-2)"; alertEl.style.display = "none"; } 
+
+    // ... (garde le code pour l'alerte budget) ...
+
     const recapList = document.getElementById('recap-list');
-    const labels = currentLang === 'fr' ? { vol: 'Vols', hotel: 'Hébergements', activ: 'Activités' } : { vol: 'Flights', hotel: 'Stays', activ: 'Activities' };
+    const labels = currentLang === 'fr' 
+        ? { vol: 'Vols', hotel: 'Hébergements', activ: 'Activités', resto: 'Restaurants' } 
+        : { vol: 'Flights', hotel: 'Stays', activ: 'Activities', resto: 'Dining' };
+
     recapList.innerHTML = `
         <div class="recap-item"><small><span class="recap-dot" style="background:#6366f1"></span>${labels.vol}</small> <span>${stats.vol}${cur}</span></div>
         <div class="recap-item"><small><span class="recap-dot" style="background:#f59e0b"></span>${labels.hotel}</small> <span>${stats.hotel}${cur}</span></div>
         <div class="recap-item"><small><span class="recap-dot" style="background:#ec4899"></span>${labels.activ}</small> <span>${stats.activ}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:#10b981"></span>${labels.resto}</small> <span>${stats.resto}${cur}</span></div>
     `;
 }
 
@@ -170,8 +172,8 @@ function delB(id) { tripData[activeDay] = tripData[activeDay].filter(x => x.id !
 
 function applyLang() { 
     const texts = { 
-        fr: { title: "Explorez le monde ✈️", subtitle: "Créez votre itinéraire sur-mesure et maîtrisez chaque dépense", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL DU VOYAGE", budget: "Budget estimé :", pdf: "📄 Télécharger en PDF", vol: "Vol", hotel: "Hôtel", activ: "Activité", alert: "⚠️ Budget dépassé !", pax: "VOYAGEURS" }, 
-        en: { title: "Explore the World ✈️", subtitle: "Create your custom itinerary and master every expense", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TRIP TOTAL", budget: "Estimated budget:", pdf: "📄 Download PDF", vol: "Flight", hotel: "Hotel", activ: "Activity", alert: "⚠️ Budget exceeded!", pax: "TRAVELERS" } 
+        fr: { title: "Explorez le monde ✈️", subtitle: "Créez votre itinéraire sur-mesure et maîtrisez chaque dépense", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL DU VOYAGE", budget: "Budget estimé :", pdf: "📄 Télécharger en PDF", vol: "Vol", hotel: "Hôtel", activ: "Activité", resto: "Restaurant", alert: "⚠️ Budget dépassé !", pax: "VOYAGEURS" }, 
+        en: { title: "Explore the World ✈️", subtitle: "Create your custom itinerary and master every expense", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TRIP TOTAL", budget: "Estimated budget:", pdf: "📄 Download PDF", vol: "Flight", hotel: "Hotel", activ: "Activity", resto: "Dining", alert: "⚠️ Budget exceeded!", pax: "TRAVELERS" } 
     }; 
     const t = texts[currentLang]; 
     document.getElementById('txt-title').innerText = t.title; 
@@ -189,6 +191,7 @@ function applyLang() {
     document.querySelectorAll('.t-vol').forEach(el => el.innerText = t.vol); 
     document.querySelectorAll('.t-hotel').forEach(el => el.innerText = t.hotel); 
     document.querySelectorAll('.t-activ').forEach(el => el.innerText = t.activ); 
+    document.querySelectorAll('.t-resto').forEach(el => el.innerText = t.resto);
     renderBlocks(); 
 }
 
@@ -256,7 +259,7 @@ async function findRestaurants() {
             
             tripData[activeDay].push({
                 id: Date.now() + Math.random(),
-                type: 'activ',
+                type: 'resto',
                 name: `🍴 ${name}${cuisine}`,
                 price: 0,
                 time: '12:00',
@@ -272,5 +275,6 @@ async function findRestaurants() {
         console.error("Erreur Overpass:", error);
     }
 }
+
 
 
