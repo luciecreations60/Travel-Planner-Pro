@@ -53,7 +53,16 @@
                 <button class="btn-main btn-activ" onclick="addBlock('activ')">🎟️ + <span class="t-activ">Activité</span></button>
                 <button class="btn-main" style="background: #10b981;" onclick="findRestaurants()">🍴 <span class="t-resto">Restaurant</span></button>
             </div>
-            <div id="blocksList"></div>
+            <div id="blocksList">
+                <div id="resto-results" style="display:none; background:#ecfdf5; border:1px solid #10b981; border-radius:15px; padding:15px; margin-bottom:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h4 style="margin:0; color:#065f46;">🍴 Suggestions à proximité</h4>
+        <button onclick="document.getElementById('resto-results').style.display='none'" style="border:none; background:none; cursor:pointer;">✕</button>
+    </div>
+    <div id="resto-list" style="display:grid; gap:8px;"></div>
+</div>
+                
+            </div>
         </div>
     </div>
     <div class="column sidebar">
@@ -93,4 +102,5 @@
 </body>
 
 </html>
+
 
