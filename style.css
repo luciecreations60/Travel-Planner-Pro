@@ -130,6 +130,16 @@ body {
     gap: 8px; 
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: var(--btn-shadow);
+    width: 100%; /* Force le bouton à prendre toute la largeur de la colonne */
+    box-sizing: border-box; /* Évite que le bouton ne dépasse à cause du padding */
+}
+
+/* On ajuste le groupe de boutons pour qu'ils soient les uns sous les autres */
+.btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
 }
 
 .btn-main:hover { transform: translateY(-3px); filter: brightness(1.1); }
@@ -209,3 +219,4 @@ input, select {
     box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
     z-index: 2000; border: 1px solid var(--border-color);
 }
+
