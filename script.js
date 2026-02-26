@@ -267,8 +267,40 @@ function delB(id) { tripData[activeDay] = tripData[activeDay].filter(x => x.id !
 
 function applyLang() { 
     const texts = { 
-        fr: { title: "Explorez le monde ✈️", subtitle: "Préparez votre itinéraire sur-mesure", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL", budget: "Budget :", pdf: "📄 PDF", vol: "Vol", hotel: "Hôtel", activ: "Activité", resto: "Resto", pax: "VOYAGEURS" }, 
-        en: { title: "Explore the World ✈️", subtitle: "Plan your custom itinerary", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TOTAL", budget: "Budget:", pdf: "📄 PDF", vol: "Flight", hotel: "Hotel", activ: "Activity", resto: "Dining", pax: "TRAVELERS" } 
+        fr: { title: "Explorez le monde ✈️", 
+             subtitle: "Préparez votre itinéraire sur-mesure", 
+             start: "DÉPART", 
+             end: "ARRIVÉE", 
+             from: "DU", 
+             to: "AU", 
+             cur: "DEVISE", 
+             total: "TOTAL", 
+             budget: "Budget :", 
+             pdf: "📄 PDF", 
+             vol: "Vol", 
+             hotel: "Hôtel", 
+             activ: "Activité", 
+             resto: "Restaurant",
+             focusShow: "Afficher l'en-tête",
+             focusHide: "Masquer l'en-tête",
+             pax: "VOYAGEURS" }, 
+        en: { title: "Explore the World ✈️", 
+             subtitle: "Plan your custom itinerary", 
+             start: "FROM", 
+             end: "TO", 
+             from: "START", 
+             to: "END", 
+             cur: "CURRENCY", 
+             total: "TOTAL", 
+             budget: "Budget:", 
+             pdf: "📄 PDF", 
+             vol: "Flight", 
+             hotel: "Hotel", 
+             activ: "Activity", 
+             resto: "Dining", 
+             focusShow: "Show Header",
+             focusHide: "Hide Header",
+             pax: "TRAVELERS" } 
     }; 
     const t = texts[currentLang]; 
     document.getElementById('txt-title').innerText = t.title; 
@@ -292,9 +324,22 @@ function applyLang() {
 function toggleFocus() {
     const isHidden = document.body.classList.toggle('header-hidden');
     const icon = document.getElementById('focus-icon');
+    const text = document.getElementById('focus-text'); // On récupère l'élément texte
+    
     icon.innerText = isHidden ? "🔽" : "🔼";
+    
+    // On met à jour le texte selon la langue et l'état
+    if (text) {
+        if (currentLang === 'fr') {
+            text.innerText = isHidden ? "Afficher l'en-tête" : "Masquer l'en-tête";
+        } else {
+            text.innerText = isHidden ? "Show Header" : "Hide Header";
+        }
+    }
+    
     setTimeout(() => { map.invalidateSize(); }, 300);
 }
 
 function clearAll() { if(confirm("Tout effacer ?")) { localStorage.clear(); location.reload(); } }
 function exportPDF() { html2pdf().from(document.body).save('Itineraire.pdf'); }
+
