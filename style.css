@@ -133,6 +133,7 @@ body {
     box-shadow: var(--btn-shadow);
     width: 100%; 
     box-sizing: border-box;
+    text-decoration: none;
 }
 
 .btn-main:hover { transform: translateY(-2px); filter: brightness(1.05); }
