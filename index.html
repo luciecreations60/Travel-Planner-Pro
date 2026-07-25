@@ -86,31 +86,26 @@
         <div class="column scrollable">
             <h2 id="currentDayTitle">Jour 1</h2>
             
-            <!-- BOUTONS DE RECHERCHE EXTÉRIEURS & AJOUTS -->
-            <div class="btn-group" style="margin-bottom: 20px;">
-                <button class="btn-main btn-vol" onclick="openFlightSearch()">✈️ 🔍 <span class="t-vol">Chercher Vol / Transport (Skyscanner)</span></button>
-                <button class="btn-main btn-hotel" onclick="openHotelSearch()">🏨 🔍 <span class="t-hotel">Chercher Hôtel (Booking)</span></button>
-                <button class="btn-main btn-activ" onclick="findActivities()">🎟️ <span class="t-activ">Activités & Visites</span></button>
-                <button class="btn-main btn-resto" onclick="findRestaurants()">🍴 <span class="t-resto">Restaurants & Cafés</span></button>
+            <!-- BARRE DE RECHERCHE D'ÉTABLISSEMENTS À LA WANDERLOG -->
+            <div class="wander-search-box">
+                <input type="text" id="wanderQuery" placeholder="🔎 Rechercher un lieu, resto, hôtel, musée..." onkeyup="if(event.key==='Enter') searchPlacesInApp()">
+                <button onclick="searchPlacesInApp()" class="btn-main" style="width:auto; padding:8px 15px; background:var(--accent);">Chercher</button>
             </div>
 
-            <!-- PANNEAU DES RECHERCHES D'ACTIVITÉS ET RESTOS -->
-            <div id="search-results-panel" style="display:none; background:var(--card-bg); border:1px solid var(--border-color); border-radius:15px; padding:15px; margin-bottom:20px;">
-                <div style="display:flex; justify-space:between; align-items:center; margin-bottom:10px;">
-                    <h4 style="margin:0; color:var(--text-main);" id="search-results-title">Recherche</h4>
-                    <button onclick="document.getElementById('search-results-panel').style.display='none'" style="border:none; background:none; cursor:pointer; color:var(--text-main); font-weight:bold;">✕</button>
-                </div>
-                
-                <div id="external-link-banner" style="margin-bottom:12px;"></div>
+            <!-- FILTRES RAPIDES INTERNES -->
+            <div class="quick-filters">
+                <button class="chip chip-vol" onclick="filterPlaces('vol')">✈️ Transports</button>
+                <button class="chip chip-hotel" onclick="filterPlaces('hotel')">🏨 Hôtels</button>
+                <button class="chip chip-activ" onclick="filterPlaces('activ')">🎟️ Activités</button>
+                <button class="chip chip-resto" onclick="filterPlaces('resto')">🍴 Restaurants</button>
+            </div>
 
-                <!-- Filtres pour Restos -->
-                <div id="resto-filters" style="display:none; gap:5px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px;">
-                    <button class="btn-api" onclick="findRestaurants('all')" style="background:var(--resto-color); color:white; width:auto;">Tous</button>
-                    <button class="btn-api" onclick="findRestaurants('pizza|italian')" style="width:auto;">🇮🇹 Italien</button>
-                    <button class="btn-api" onclick="findRestaurants('burger|fast_food')" style="width:auto;">🍔 Fast-Food</button>
-                    <button class="btn-api" onclick="findRestaurants('cafe|bakery')" style="width:auto;">☕ Café</button>
+            <!-- PANNEAU DE RÉSULTATS DE RECHERCHE -->
+            <div id="search-results-panel" style="display:none;" class="results-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0;" id="search-results-title">Résultats</h4>
+                    <button onclick="closeResults()" style="border:none; background:none; cursor:pointer; font-weight:bold; color:var(--text-main);">✕</button>
                 </div>
-
                 <div id="results-list" style="display:grid; gap:8px;"></div>
             </div>
 
@@ -132,15 +127,12 @@
                 <div id="alertLimit" style="display:none; color:#fca5a5; font-weight:bold; font-size:0.8rem; margin-top:5px;">⚠️ Budget dépassé !</div>
             </div>
 
-            <!-- RÉCAPITULATIF PAR CATÉGORIE & ÉQUILIBRE DES COMPTES -->
+            <!-- RÉCAPITULATIF & ÉQUILIBRE -->
             <div class="timeline recap-card">
                 <div id="recap-list" style="display:grid; gap:8px;"></div>
-                
                 <hr style="border:0; border-top:1px solid var(--border-color); margin:15px 0;">
-                
                 <h4 style="margin:0 0 10px 0; color:var(--text-main);">⚖️ Équilibre des comptes</h4>
                 <div id="split-summary" style="display:grid; gap:6px; font-size:0.85rem;"></div>
-
                 <button class="btn-main" id="btn-pdf" onclick="exportPDF()" style="background:#10b981; margin-top:15px;">📄 Télécharger en PDF</button>
             </div>
 
