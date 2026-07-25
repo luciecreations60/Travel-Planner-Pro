@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mon Travel Planner</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -21,42 +20,36 @@
         <p id="txt-subtitle">Préparez votre itinéraire sur-mesure</p>
     </div>
 
-    <!-- BARRE DE CONFIGURATION -->
+    <!-- BARRE DE CONFIGURATION DE VOYAGE -->
     <div class="search-bar">
         <div>
-            <label id="lbl-start" style="font-size:0.7rem; font-weight:bold; display:block;">DÉPART</label>
+            <label style="font-size:0.7rem; font-weight:bold; display:block;">DÉPART</label>
             <input type="text" id="cityStart" placeholder="Ex: Paris" oninput="handleSearch(this.value, 'start')">
             <div id="suggestionsStart" class="suggest-box" style="display:none;"></div>
         </div>
         <div>
-            <label id="lbl-end" style="font-size:0.7rem; font-weight:bold; display:block;">ARRIVÉE</label>
-            <input type="text" id="cityEnd" placeholder="Ex: Rome" oninput="handleSearch(this.value, 'end')">
+            <label style="font-size:0.7rem; font-weight:bold; display:block;">ARRIVÉE (DESTINATION)</label>
+            <input type="text" id="cityEnd" placeholder="Ex: Ajaccio" oninput="handleSearch(this.value, 'end')">
             <div id="suggestionsEnd" class="suggest-box" style="display:none;"></div>
         </div>
         <div>
-            <label id="lbl-from" style="font-size:0.7rem; font-weight:bold; display:block;">DU</label>
+            <label style="font-size:0.7rem; font-weight:bold; display:block;">DU</label>
             <input type="date" id="dateStart" onchange="initDates()">
         </div>
         <div>
-            <label id="lbl-to" style="font-size:0.7rem; font-weight:bold; display:block;">AU</label>
+            <label style="font-size:0.7rem; font-weight:bold; display:block;">AU</label>
             <input type="date" id="dateEnd" onchange="generateTimeline()">
         </div>
         <div>
-            <label id="lbl-cur" style="font-size:0.7rem; font-weight:bold; display:block;">DEVISE</label>
+            <label style="font-size:0.7rem; font-weight:bold; display:block;">DEVISE</label>
             <select id="currency" onchange="saveAndRefresh()">
                 <option value="€">€ (EUR)</option>
                 <option value="$">$ (USD)</option>
-                <option value="£">£ (GBP)</option>
             </select>
         </div>
         <div>
-            <label id="lbl-pax" style="font-size:0.7rem; font-weight:bold; display:block;">VOYAGEURS</label>
+            <label style="font-size:0.7rem; font-weight:bold; display:block;">VOYAGEURS</label>
             <input type="number" id="pax" value="1" min="1" style="width:50px;" onchange="saveAndRefresh()">
-        </div>
-        <div>
-            <label style="font-size:0.7rem; font-weight:bold; display:block;">POLARSTEPS</label>
-            <input type="url" id="polarstepsUrl" placeholder="Lien Polarsteps" onchange="saveAndRefresh()" style="width:130px;">
-            <a id="btnPolarsteps" href="#" target="_blank" style="display:none; font-size:0.8rem; text-decoration:none; margin-left:5px;">📍 Voir</a>
         </div>
     </div>
 
@@ -68,78 +61,163 @@
             <div class="timeline scrollable">
                 <h3 style="margin-top:0;">🗓️ Itinéraire</h3>
                 <div id="timelineArea"></div>
-                
                 <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
-                
                 <div class="btn-group">
                     <button class="btn-main" onclick="clearAll()" style="background: #ef4444;">🗑️ Tout effacer</button>
                     <button class="btn-main" onclick="downloadData()" style="background: #3b82f6;">💾 Sauvegarder</button>
-                    <button class="btn-main" onclick="toggleFocus()" style="background: #64748b;">
-                        <span id="focus-icon">🔼</span> 
-                        <span id="focus-text">Masquer l'en-tête</span>
-                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- COLONNE CENTRALE : PLANIFICATEUR DU JOUR -->
+        <!-- COLONNE CENTRALE : DÉTAIL DU JOUR ET MODULES -->
         <div class="column scrollable">
             <h2 id="currentDayTitle">Jour 1</h2>
             
-            <!-- BARRE DE RECHERCHE D'ÉTABLISSEMENTS À LA WANDERLOG -->
-            <div class="wander-search-box">
-                <input type="text" id="wanderQuery" placeholder="🔎 Rechercher un lieu, resto, hôtel, musée..." onkeyup="if(event.key==='Enter') searchPlacesInApp()">
+            <!-- PANNEAU RECHERCHE AVEC DISTANCE EN KM -->
+            <div class="wander-search-box" style="flex-wrap: wrap;">
+                <input type="text" id="wanderQuery" placeholder="🔎 Lieu, restaurant, hôtel..." style="flex:2; min-width:180px;" onkeyup="if(event.key==='Enter') searchPlacesInApp()">
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <label style="font-size:0.75rem; font-weight:600;">Rayon:</label>
+                    <select id="searchRadius" style="padding:10px;">
+                        <option value="5">5 km</option>
+                        <option value="15" selected>15 km</option>
+                        <option value="30">30 km</option>
+                        <option value="50">50 km</option>
+                    </select>
+                </div>
                 <button onclick="searchPlacesInApp()" class="btn-main" style="width:auto; padding:8px 15px; background:var(--accent);">Chercher</button>
             </div>
 
-            <!-- FILTRES RAPIDES INTERNES -->
+            <!-- FILTRES RAPIDES ET AJOUT DE TRANSPORT -->
             <div class="quick-filters">
-                <button class="chip chip-vol" onclick="filterPlaces('vol')">✈️ Transports</button>
-                <button class="chip chip-hotel" onclick="filterPlaces('hotel')">🏨 Hôtels</button>
+                <button class="chip chip-hotel" onclick="openHotelModal()">🏨 + Hébergement (Multi-jours)</button>
+                <button class="chip chip-vol" onclick="toggleTransportMenu()">🚆 + Transport (Ferries, Bus, Train...)</button>
                 <button class="chip chip-activ" onclick="filterPlaces('activ')">🎟️ Activités</button>
                 <button class="chip chip-resto" onclick="filterPlaces('resto')">🍴 Restaurants</button>
+            </div>
+
+            <!-- DROPDOWN CHOIX DU TRANSPORT (AVEC ICONES COMME CAPTURE) -->
+            <div id="transportMenu" class="transport-dropdown" style="display:none;">
+                <div class="transport-opt" onclick="openTransportModal('Bus', '🚌')">🚌 Bus</div>
+                <div class="transport-opt" onclick="openTransportModal('Train', '🚆')">🚆 Train</div>
+                <div class="transport-opt" onclick="openTransportModal('Ferry', '⛴️')">⛴️ Ferry / Bateau</div>
+                <div class="transport-opt" onclick="openTransportModal('Avion', '✈️')">✈️ Avion</div>
+                <div class="transport-opt" onclick="openTransportModal('Voiture', '🚗')">🚗 Voiture / Location</div>
             </div>
 
             <!-- PANNEAU DE RÉSULTATS DE RECHERCHE -->
             <div id="search-results-panel" style="display:none;" class="results-panel">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h4 style="margin:0;" id="search-results-title">Résultats</h4>
-                    <button onclick="closeResults()" style="border:none; background:none; cursor:pointer; font-weight:bold; color:var(--text-main);">✕</button>
+                    <h4 style="margin:0;">Résultats à proximité</h4>
+                    <button onclick="closeResults()" style="border:none; background:none; cursor:pointer;">✕</button>
                 </div>
                 <div id="results-list" style="display:grid; gap:8px;"></div>
             </div>
 
-            <!-- Liste des événements du jour -->
+            <!-- Liste des événements / cartes du jour -->
             <div id="blocksList"></div>
         </div>
 
-        <!-- COLONNE DROITE : CARTE EN HAUT (1/3) + BUDGET & RÉCAP EN BAS -->
+        <!-- COLONNE DROITE : CARTE EN HAUT (1/3) + BUDGET -->
         <div class="column sidebar">
-            <!-- CARTE LEAFLET (1/3 DE LA HAUTEUR) -->
             <div id="map"></div>
 
-            <!-- CARTE BUDGET -->
             <div class="budget-card">
                 <small id="txt-total-lbl">TOTAL DU VOYAGE</small>
                 <h1 id="totalLabel" style="margin:5px 0;">0€</h1>
                 <div style="font-size:0.8rem; opacity:0.9;">
-                    <span id="txt-budget-lbl">Budget estimé :</span> 
+                    <span>Budget estimé :</span> 
                     <input type="number" id="budgetMax" style="width:70px; background:rgba(255,255,255,0.2); border:none; color:white; font-weight:bold; text-align:center;" oninput="saveAndRefresh()">
-                    <span class="cur-symbol">€</span>
+                    <span>€</span>
                 </div>
-                <div id="alertLimit" style="display:none; color:#fca5a5; font-weight:bold; font-size:0.8rem; margin-top:5px;">⚠️ Budget dépassé !</div>
             </div>
 
-            <!-- RÉCAPITULATIF & ÉQUILIBRE -->
             <div class="timeline recap-card">
                 <div id="recap-list" style="display:grid; gap:8px;"></div>
                 <hr style="border:0; border-top:1px solid var(--border-color); margin:15px 0;">
-                <h4 style="margin:0 0 10px 0; color:var(--text-main);">⚖️ Équilibre des comptes</h4>
+                <h4 style="margin:0 0 10px 0;">⚖️ Équilibre des comptes</h4>
                 <div id="split-summary" style="display:grid; gap:6px; font-size:0.85rem;"></div>
-                <button class="btn-main" id="btn-pdf" onclick="exportPDF()" style="background:#10b981; margin-top:15px;">📄 Télécharger en PDF</button>
             </div>
         </div>
 
+    </div>
+
+    <!-- MODAL : AJOUT D'HÔTEL MULTI-JOURS -->
+    <div id="hotelModal" class="modal-bg" style="display:none;">
+        <div class="modal-box">
+            <h3>🏨 Ajouter un Hébergement</h3>
+            <label>Nom de l'établissement</label>
+            <input type="text" id="hotelName" placeholder="Ex: Camping L'esplanade">
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <div style="flex:1;">
+                    <label>Check-in (Arrivée)</label>
+                    <input type="date" id="hotelStart">
+                </div>
+                <div style="flex:1;">
+                    <label>Check-out (Départ)</label>
+                    <input type="date" id="hotelEnd">
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <div style="flex:1;">
+                    <label>Prix Total</label>
+                    <input type="number" id="hotelPrice" placeholder="0">
+                </div>
+                <div style="flex:1;">
+                    <label>Payé par</label>
+                    <input type="text" id="hotelPayer" value="Moi">
+                </div>
+            </div>
+            <div style="margin-top:15px; display:flex; gap:10px; justify-end;">
+                <button onclick="closeModal('hotelModal')" class="btn-main" style="background:#64748b;">Annuler</button>
+                <button onclick="saveHotel()" class="btn-main" style="background:var(--accent);">Ajouter au planning</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL : AJOUT DE TRANSPORT DÉTAILLÉ (STYLE CAPTURE D'ÉCRAN) -->
+    <div id="transportModal" class="modal-bg" style="display:none;">
+        <div class="modal-box">
+            <h3 id="transportModalTitle">🚆 Ajouter un Transport</h3>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div>
+                    <label>Lieu de Départ</label>
+                    <input type="text" id="transFrom" placeholder="Ex: Mâcon Nord Hotel">
+                </div>
+                <div>
+                    <label>Lieu d'Arrivée</label>
+                    <input type="text" id="transTo" placeholder="Ex: Ferries Nice">
+                </div>
+                <div>
+                    <label>Date & Heure de Départ</label>
+                    <input type="datetime-local" id="transDateStart">
+                </div>
+                <div>
+                    <label>Date & Heure d'Arrivée</label>
+                    <input type="datetime-local" id="transDateEnd">
+                </div>
+                <div>
+                    <label>Transporteur / Compagnie</label>
+                    <input type="text" id="transCompany" placeholder="Ex: Corsica Ferries / SNCF">
+                </div>
+                <div>
+                    <label>N° Confirmation</label>
+                    <input type="text" id="transCode" placeholder="Ex: CF-98213">
+                </div>
+                <div>
+                    <label>Coût</label>
+                    <input type="number" id="transCost" placeholder="155">
+                </div>
+                <div>
+                    <label>Payé par</label>
+                    <input type="text" id="transPayer" value="Moi">
+                </div>
+            </div>
+            <div style="margin-top:15px; display:flex; gap:10px; justify-end;">
+                <button onclick="closeModal('transportModal')" class="btn-main" style="background:#64748b;">Annuler</button>
+                <button onclick="saveTransport()" class="btn-main" style="background:var(--vol-color);">Enregistrer transport</button>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts CDN -->
