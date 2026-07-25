@@ -2,17 +2,38 @@ let activeDay = 1;
 let tripData = JSON.parse(localStorage.getItem('travelPlannerData')) || {};
 let map;
 let itemMarkers = [];
+let searchMarker = null;
 let selectedTransportType = 'Train';
 
-// 1. INITIALISATION DE LA CARTE AVEC EVENEMENT CLIC
-function initMap(center = [41.9272, 8.7346], zoom = 9) {
+// 1. INITIALISATION DE LA CARTE ET DÉTECTION DES CLICS
+function initMap(center = [46.3068, 4.8314], zoom = 7) { // Par défaut centré sur la France
     if(map) map.remove();
     map = L.map('map').setView(center, zoom);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
+        attribution: '&copy; OpenStreetMap' 
+    }).addTo(map);
 
-    // Clic sur la carte pour ajouter un point d'intérêt
-    map.on('click', function(e) {
-        openQuickAddModal('activ', 'Lieu sur la carte', e.latlng.lat, e.latlng.lng);
+    // Clic direct sur la carte pour récupérer le nom du lieu et ajouter un point
+    map.on('click', async function(e) {
+        const lat = e.latlng.lat;
+        const lon = e.latlng.lng;
+        
+        let placeName = `Lieu (${lat.toFixed(3)}, ${lon.toFixed(3)})`;
+        
+        // Reverse Geocoding via Nominatim
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, {
+                headers: { 'User-Agent': 'TravelPlannerApp/1.0' }
+            });
+            const data = await res.json();
+            if (data && data.display_name) {
+                placeName = data.display_name.split(',')[0];
+            }
+        } catch(err) {
+            console.error(err);
+        }
+
+        openQuickAddModal('activ', placeName, lat, lon);
     });
 }
 
@@ -27,7 +48,7 @@ window.onload = () => {
 
 function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
 
-// 2. TIMELINE & SÉLECTION DU JOUR
+// 2. TIMELINE ET SÉLECTION DU JOUR
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -52,61 +73,66 @@ function generateTimeline() {
         curr.setDate(curr.getDate() + 1); 
         d++;
     }
-    updateDayTitle(); renderBlocks(); save();
+    updateDayTitle(); populateDaySelector(); renderBlocks(); save();
 }
 
 function updateDayTitle() { document.getElementById('currentDayTitle').innerText = 'Jour ' + activeDay; }
 
-// 3. FONCTION DE RECHERCHE CORRIGÉE
+function populateDaySelector() {
+    const select = document.getElementById('quickAddDaySelect');
+    if (!select) return;
+    select.innerHTML = "";
+    const totalDays = Object.keys(tripData).length || 1;
+    for (let i = 1; i <= Math.max(totalDays, 14); i++) {
+        let opt = document.createElement('option');
+        opt.value = i;
+        opt.innerText = `Jour ${i}`;
+        if (i === activeDay) opt.selected = true;
+        select.appendChild(opt);
+    }
+}
+
+// 3. FONCTION DE RECHERCHE MONDIALE AVEC RECENTRAGE AUTOMATIQUE SUR LA CARTE
 async function searchPlacesInApp() {
     const query = document.getElementById('wanderQuery').value.trim();
-    const cityEnd = document.getElementById('cityEnd').value.trim();
-    const radiusKm = parseFloat(document.getElementById('searchRadius').value);
-
     if (!query) return;
 
     const panel = document.getElementById('search-results-panel');
     const list = document.getElementById('results-list');
     panel.style.display = 'block';
-    list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">🔍 Recherche en cours...</div>`;
+    list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">🔍 Recherche de "${query}"...</div>`;
 
     try {
-        let lat = 41.9272, lon = 8.7346; // Par défaut : Corse/Ajaccio
-        
-        // Résolution des coordonnées de la ville si disponible
-        if (cityEnd) {
-            const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityEnd)}&limit=1`, {
-                headers: { 'User-Agent': 'TravelPlannerApp/1.0' }
-            });
-            const geoData = await geoRes.json();
-            if (geoData && geoData.length > 0) {
-                lat = parseFloat(geoData[0].lat);
-                lon = parseFloat(geoData[0].lon);
-                map.setView([lat, lon], 10);
-            }
-        }
-
-        // Calcul de la Bounding Box pour le rayon
-        const delta = radiusKm / 111; 
-        const viewbox = `${lon - delta},${lat + delta},${lon + delta},${lat - delta}`;
-
-        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${viewbox}&bounded=1&limit=6`;
+        // Recherche globale sans Bounding Box restrictive
+        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
         const res = await fetch(searchUrl, { headers: { 'User-Agent': 'TravelPlannerApp/1.0' } });
         const data = await res.json();
 
         list.innerHTML = "";
         if (!data || data.length === 0) {
-            list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">Aucun résultat trouvé dans ce rayon. <br><button class="btn-main btn-primary" style="margin-top:5px; font-size:0.75rem;" onclick="openQuickAddModal('activ', '${query.replace(/'/g, "\\'")}')">Ajouter manuellement</button></div>`;
+            list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">Aucun résultat trouvé.<br><button class="btn-main btn-primary" style="margin-top:5px; font-size:0.75rem;" onclick="openQuickAddModal('activ', '${query.replace(/'/g, "\\'")}')">Ajouter manuellement</button></div>`;
             return;
         }
 
+        // Si une ville/lieu est trouvé, recentrer immédiatement la carte sur le premier résultat !
+        const topResult = data[0];
+        const lat = parseFloat(topResult.lat);
+        const lon = parseFloat(topResult.lon);
+        
+        map.setView([lat, lon], 12);
+
+        if (searchMarker) map.removeLayer(searchMarker);
+        searchMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<b>${topResult.display_name.split(',')[0]}</b>`).openPopup();
+
         data.forEach(place => {
             let title = place.display_name.split(',')[0];
+            let sub = place.display_name.split(',').slice(1, 3).join(',');
             let div = document.createElement('div');
             div.className = "place-card-result";
             div.innerHTML = `
                 <div>
                     <strong>${title}</strong>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">${sub}</div>
                 </div>
                 <button class="btn-main btn-primary" style="padding:4px 8px; font-size:0.75rem;" onclick="addBlockFromSearch('${title.replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">Ajouter</button>
             `;
@@ -115,7 +141,7 @@ async function searchPlacesInApp() {
 
     } catch(e) {
         console.error(e);
-        list.innerHTML = `<div style="font-size:0.8rem; color:red; padding:5px;">Erreur de chargement. Vérifiez votre connexion.</div>`;
+        list.innerHTML = `<div style="font-size:0.8rem; color:red; padding:5px;">Erreur de connexion lors de la recherche.</div>`;
     }
 }
 
@@ -140,7 +166,7 @@ function saveHotel() {
 
     const startDate = new Date(start);
     const endDate = new Date(end);
-    const tripStart = new Date(document.getElementById('dateStart').value);
+    const tripStart = new Date(document.getElementById('dateStart').value || Date.now());
 
     const totalNights = Math.max(1, Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)));
     const pricePerNight = price / totalNights;
@@ -208,30 +234,36 @@ function saveTransport() {
     save();
 }
 
-// 6. AJOUT RAPIDE & CLIC SUR CARTE
-function openQuickAddModal(type, name = '', lat = null, lon = null) {
-    document.getElementById('quickAddType').value = type;
+// 6. AJOUT MODAL ET CHOIX DE JOUR ET DE CATÉGORIE
+function openQuickAddModal(defaultType = 'activ', name = '', lat = null, lon = null) {
+    populateDaySelector();
+    document.getElementById('quickAddType').value = defaultType;
     document.getElementById('quickAddName').value = name;
     document.getElementById('quickAddLat').value = lat || '';
     document.getElementById('quickAddLon').value = lon || '';
-    document.getElementById('targetDayLabel').innerText = activeDay;
-    document.getElementById('quickAddTitle').innerText = type === 'resto' ? '🍴 Ajouter un Restaurant' : '🎟️ Ajouter une Activité';
     document.getElementById('quickAddModal').style.display = 'flex';
 }
 
 function saveQuickAdd() {
+    const targetDay = parseInt(document.getElementById('quickAddDaySelect').value) || activeDay;
     const type = document.getElementById('quickAddType').value;
-    const name = document.getElementById('quickAddName').value || 'Élément';
+    let name = document.getElementById('quickAddName').value || 'Élément';
     const price = parseFloat(document.getElementById('quickAddPrice').value) || 0;
     const time = document.getElementById('quickAddTime').value || '12:00';
     const lat = parseFloat(document.getElementById('quickAddLat').value) || null;
     const lon = parseFloat(document.getElementById('quickAddLon').value) || null;
 
-    if (!tripData[activeDay]) tripData[activeDay] = [];
-    tripData[activeDay].push({
+    // Prefixes d'icônes
+    const icons = { hotel: '🏨 ', vol: '🚆 ', activ: '🎟️ ', resto: '🍴 ' };
+    if (!name.match(/^(🏨|🚆|🎟️|🍴)/)) {
+        name = (icons[type] || '') + name;
+    }
+
+    if (!tripData[targetDay]) tripData[targetDay] = [];
+    tripData[targetDay].push({
         id: Date.now(),
         type,
-        name: (type === 'resto' ? '🍴 ' : '🎟️ ') + name,
+        name,
         price,
         time,
         notes: '',
@@ -246,7 +278,7 @@ function saveQuickAdd() {
 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-// 7. RENDU DES ÉVÉNEMENTS DU JOUR ET DU RÉSUMÉ PAR CATÉGORIES
+// 7. RENDU DES ÉVÉNEMENTS DU JOUR ET DE LA SYNTHÈSE
 function renderBlocks() {
     const list = document.getElementById('blocksList');
     list.innerHTML = "";
@@ -301,10 +333,12 @@ function renderCategoriesRecap() {
             let div = document.createElement('div');
             div.className = 'cat-item';
             div.onclick = () => {
+                activeDay = parseInt(item.dayNum);
+                generateTimeline();
                 if (item.lat && item.lon) map.setView([item.lat, item.lon], 14);
             };
             div.innerHTML = `
-                <span>${item.name} <small>(J${item.dayNum})</small></span>
+                <span>${item.name} <small style="color:var(--text-muted);">(J${item.dayNum})</small></span>
                 <strong>${item.price.toFixed(0)}${cur}</strong>
             `;
             catContainer.appendChild(div);
