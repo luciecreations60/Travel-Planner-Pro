@@ -132,10 +132,11 @@ function updateTotal() {
     else { polarBtn.style.display = "none"; }
 }
 
-// 4. RECHERCHE INTERNE INTÉGRÉE (OPTION B - SANS LIEN EXTÉRIEUR)
+// 4. RECHERCHE CORRIGÉE AVEC DEUX NIVEAUX DE SECOURS (N'EST PLUS JAMAIS VIDE)
 async function searchPlacesInApp() {
-    const query = document.getElementById('wanderQuery').value.trim();
-    const cityEnd = document.getElementById('cityEnd').value;
+    const rawQuery = document.getElementById('wanderQuery').value;
+    const query = rawQuery.trim().toLowerCase();
+    const cityEnd = document.getElementById('cityEnd').value.trim();
 
     if (!query) return;
 
@@ -144,56 +145,79 @@ async function searchPlacesInApp() {
     panel.style.display = 'block';
     list.innerHTML = `<div style="display:flex; align-items:center; gap:8px; padding:10px;"><div class="spinner"></div> Recherche en cours...</div>`;
 
-    // Recherche avec Nominatim OpenStreetMap (Gratuit)
-    const searchQuery = cityEnd ? `${query}, ${cityEnd}` : query;
-    const url = `https://nominatim.openstreetmap.org/search?format=json&accept-language=${currentLang}&q=${encodeURIComponent(searchQuery)}&limit=5`;
+    let data = [];
 
+    // Tentative 1 : Recherche combinée (Lieu + Ville)
     try {
-        const res = await fetch(url);
-        const data = await res.json();
-        list.innerHTML = "";
+        const searchQuery = cityEnd ? `${query}, ${cityEnd}` : query;
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&accept-language=${currentLang}&q=${encodeURIComponent(searchQuery)}&limit=5`);
+        data = await res.json();
+    } catch(e) {}
 
-        if (data.length === 0) {
-            list.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted);">Aucun résultat trouvé pour "${query}".</p>`;
-            return;
-        }
+    // Tentative 2 (Fallback) : Recherche du terme seul si la tentative 1 est vide
+    if (!data || data.length === 0) {
+        try {
+            const resFallback = await fetch(`https://nominatim.openstreetmap.org/search?format=json&accept-language=${currentLang}&q=${encodeURIComponent(query)}&limit=5`);
+            data = await resFallback.json();
+        } catch(e) {}
+    }
 
-        data.forEach(place => {
-            let typeDetected = 'activ';
-            if (place.type === 'restaurant' || place.type === 'cafe' || place.type === 'fast_food') typeDetected = 'resto';
-            else if (place.type === 'hotel' || place.type === 'guest_house' || place.type === 'hostel') typeDetected = 'hotel';
-            else if (place.type === 'aeroway' || place.type === 'station') typeDetected = 'vol';
+    list.innerHTML = "";
 
-            let div = document.createElement('div');
-            div.className = "place-card-result";
-            div.innerHTML = `
-                <div style="flex:1; padding-right:10px;">
-                    <strong style="font-size:0.85rem; display:block;">${place.display_name.split(',')[0]}</strong>
-                    <small style="font-size:0.75rem; color:var(--text-muted);">${place.display_name.split(',').slice(1, 3).join(',')}</small>
+    // Si vraiment aucun résultat n'a été trouvé, on propose de créer le lieu manuellement
+    if (!data || data.length === 0) {
+        let typeDetected = 'activ';
+        if (query.includes('resto') || query.includes('manger') || query.includes('cafe')) typeDetected = 'resto';
+        else if (query.includes('hotel') || query.includes('logement')) typeDetected = 'hotel';
+        else if (query.includes('vol') || query.includes('gare')) typeDetected = 'vol';
+
+        list.innerHTML = `
+            <div style="padding:10px; font-size:0.85rem; color:var(--text-muted);">
+                Aucun lieu exact trouvé sur la carte pour "${rawQuery}".
+            </div>
+            <div class="place-card-result">
+                <div>
+                    <strong style="font-size:0.85rem;">${rawQuery}</strong><br>
+                    <small style="color:var(--text-muted);">Créer un bloc personnalisé</small>
                 </div>
-                <button class="btn-main" style="width:auto; padding:6px 12px; font-size:0.75rem; background:var(--accent);" onclick="addBlock('${typeDetected}', '${place.display_name.split(',')[0].replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">
+                <button class="btn-main" style="width:auto; padding:6px 12px; font-size:0.75rem; background:var(--accent);" onclick="addBlock('${typeDetected}', '${rawQuery.replace(/'/g, "\\'")}')">
                     + Ajouter
                 </button>
-            `;
-            list.appendChild(div);
-        });
-
-    } catch (e) {
-        list.innerHTML = `<p style="font-size:0.8rem; color:#ef4444;">Erreur lors de la recherche.</p>`;
+            </div>
+        `;
+        return;
     }
+
+    // Affichage des résultats
+    data.forEach(place => {
+        let typeDetected = 'activ';
+        if (place.type === 'restaurant' || place.type === 'cafe' || place.type === 'fast_food') typeDetected = 'resto';
+        else if (place.type === 'hotel' || place.type === 'guest_house' || place.type === 'hostel') typeDetected = 'hotel';
+        else if (place.type === 'aeroway' || place.type === 'station') typeDetected = 'vol';
+
+        const placeTitle = place.display_name.split(',')[0];
+        const placeSub = place.display_name.split(',').slice(1, 3).join(',');
+
+        let div = document.createElement('div');
+        div.className = "place-card-result";
+        div.innerHTML = `
+            <div style="flex:1; padding-right:10px;">
+                <strong style="font-size:0.85rem; display:block;">${placeTitle}</strong>
+                <small style="font-size:0.75rem; color:var(--text-muted);">${placeSub}</small>
+            </div>
+            <button class="btn-main" style="width:auto; padding:6px 12px; font-size:0.75rem; background:var(--accent);" onclick="addBlock('${typeDetected}', '${placeTitle.replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">
+                + Ajouter
+            </button>
+        `;
+        list.appendChild(div);
+    });
 }
 
 // Filtres rapides pour la recherche automatique par catégorie
 async function filterPlaces(type) {
-    const cityEnd = document.getElementById('cityEnd').value;
-    if (!cityEnd) {
-        alert(currentLang === 'fr' ? "Renseigne d'abord une ville d'arrivée." : "Please fill in destination.");
-        return;
-    }
-
-    if (type === 'vol') document.getElementById('wanderQuery').value = "Gare ou Aéroport";
+    if (type === 'vol') document.getElementById('wanderQuery').value = "Gare";
     else if (type === 'hotel') document.getElementById('wanderQuery').value = "Hôtel";
-    else if (type === 'activ') document.getElementById('wanderQuery').value = "Musée ou Monument";
+    else if (type === 'activ') document.getElementById('wanderQuery').value = "Musée";
     else if (type === 'resto') document.getElementById('wanderQuery').value = "Restaurant";
 
     searchPlacesInApp();
