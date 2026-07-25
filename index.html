@@ -86,30 +86,32 @@
         <div class="column scrollable">
             <h2 id="currentDayTitle">Jour 1</h2>
             
-            <!-- Ajouter des éléments -->
+            <!-- BOUTONS DE RECHERCHE EXTÉRIEURS & AJOUTS -->
             <div class="btn-group" style="margin-bottom: 20px;">
-                <button class="btn-main btn-vol" onclick="addBlock('vol')">✈️ + <span class="t-vol">Vol / Transport</span></button>
-                <button class="btn-main btn-hotel" onclick="addBlock('hotel')">🏨 + <span class="t-hotel">Hôtel</span></button>
-                <button class="btn-main btn-activ" onclick="findActivities()">🎟️ + <span class="t-activ">Activité</span></button>
-                <button class="btn-main btn-resto" onclick="findRestaurants()">🍴 + <span class="t-resto">Restaurant</span></button>
+                <button class="btn-main btn-vol" onclick="openFlightSearch()">✈️ 🔍 <span class="t-vol">Chercher Vol / Transport (Skyscanner)</span></button>
+                <button class="btn-main btn-hotel" onclick="openHotelSearch()">🏨 🔍 <span class="t-hotel">Chercher Hôtel (Booking)</span></button>
+                <button class="btn-main btn-activ" onclick="findActivities()">🎟️ <span class="t-activ">Activités & Visites</span></button>
+                <button class="btn-main btn-resto" onclick="findRestaurants()">🍴 <span class="t-resto">Restaurants & Cafés</span></button>
             </div>
 
-            <!-- Moteur de recherche d'Activités & Restaurants -->
-            <div id="resto-results" style="display:none; background:var(--card-bg); border:1px solid var(--resto-color); border-radius:15px; padding:15px; margin-bottom:20px;">
+            <!-- PANNEAU DES RECHERCHES D'ACTIVITÉS ET RESTOS -->
+            <div id="search-results-panel" style="display:none; background:var(--card-bg); border:1px solid var(--border-color); border-radius:15px; padding:15px; margin-bottom:20px;">
                 <div style="display:flex; justify-space:between; align-items:center; margin-bottom:10px;">
-                    <h4 style="margin:0; color:var(--resto-color);" id="search-results-title">🍴 Suggestions à proximité</h4>
-                    <button onclick="document.getElementById('resto-results').style.display='none'" style="border:none; background:none; cursor:pointer; color:var(--text-main);">✕</button>
+                    <h4 style="margin:0; color:var(--text-main);" id="search-results-title">Recherche</h4>
+                    <button onclick="document.getElementById('search-results-panel').style.display='none'" style="border:none; background:none; cursor:pointer; color:var(--text-main); font-weight:bold;">✕</button>
                 </div>
                 
-                <!-- Filtres -->
-                <div id="resto-filters" style="display:flex; gap:5px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px;">
-                    <button class="btn-api" onclick="findRestaurants('all')" style="background:var(--resto-color); color:white; width:auto;">Tous Restos</button>
+                <div id="external-link-banner" style="margin-bottom:12px;"></div>
+
+                <!-- Filtres pour Restos -->
+                <div id="resto-filters" style="display:none; gap:5px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px;">
+                    <button class="btn-api" onclick="findRestaurants('all')" style="background:var(--resto-color); color:white; width:auto;">Tous</button>
                     <button class="btn-api" onclick="findRestaurants('pizza|italian')" style="width:auto;">🇮🇹 Italien</button>
                     <button class="btn-api" onclick="findRestaurants('burger|fast_food')" style="width:auto;">🍔 Fast-Food</button>
                     <button class="btn-api" onclick="findRestaurants('cafe|bakery')" style="width:auto;">☕ Café</button>
                 </div>
 
-                <div id="resto-list" style="display:grid; gap:8px;"></div>
+                <div id="results-list" style="display:grid; gap:8px;"></div>
             </div>
 
             <!-- Liste des événements du jour -->
