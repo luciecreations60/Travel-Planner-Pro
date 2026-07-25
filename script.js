@@ -165,6 +165,7 @@ function generateTimeline() {
 function updateDayTitle() { document.getElementById('currentDayTitle').innerText = (currentLang === 'fr' ? 'Jour ' : 'Day ') + activeDay; }
 
 function addBlock(type, name = '', lat = null, lon = null) { 
+    if(!tripData[activeDay]) tripData[activeDay] = [];
     tripData[activeDay].push({ 
         id: Date.now(), 
         type, 
@@ -258,19 +259,98 @@ async function updateB(id, f, v) {
     save(); 
 }
 
-// 5. RECHERCHE DE LIEUX ET RESTAURANTS
-async function findPlaces(category = 'resto', filter = 'all') {
-    if (!markers['end']) {
-        alert(currentLang === 'fr' ? "Choisissez d'abord une destination dans la barre de recherche." : "Please select a destination first.");
+// 5. FONCTIONS DE REDIRECTIONS EXTÉRIEURES (SKYSCANNER, BOOKING, GETYOURGUIDE)
+function openFlightSearch() {
+    const startCity = document.getElementById('cityStart').value;
+    const endCity = document.getElementById('cityEnd').value;
+    const startDate = document.getElementById('dateStart').value;
+
+    if (!startCity || !endCity) {
+        alert(currentLang === 'fr' ? "Indique une ville de départ et d'arrivée." : "Please fill in start and end cities.");
         return;
     }
-    const resultsDiv = document.getElementById('resto-results');
-    const listDiv = document.getElementById('resto-list');
+
+    let travelDate = startDate;
+    if (startDate) {
+        let d = new Date(startDate);
+        d.setDate(d.getDate() + (activeDay - 1));
+        travelDate = d.toISOString().split('T')[0];
+    }
+
+    const skyscannerUrl = `https://www.skyscanner.fr/transports/vols/${encodeURIComponent(startCity)}/${encodeURIComponent(endCity)}/${travelDate}/`;
+    window.open(skyscannerUrl, '_blank');
+
+    addBlock('vol', `Vol ${startCity} ➔ ${endCity}`);
+}
+
+function openHotelSearch() {
+    const endCity = document.getElementById('cityEnd').value;
+    const startDate = document.getElementById('dateStart').value;
+
+    if (!endCity) {
+        alert(currentLang === 'fr' ? "Indique d'abord ta destination." : "Please fill in destination.");
+        return;
+    }
+
+    let checkin = startDate;
+    if (startDate) {
+        let d = new Date(startDate);
+        d.setDate(d.getDate() + (activeDay - 1));
+        checkin = d.toISOString().split('T')[0];
+    }
+
+    const bookingUrl = `https://www.booking.com/searchresults.fr.html?ss=${encodeURIComponent(endCity)}&checkin=${checkin}`;
+    window.open(bookingUrl, '_blank');
+
+    addBlock('hotel', `Hôtel à ${endCity}`);
+}
+
+// 6. RECHERCHE ET SUGGESTIONS SUR CARTE & LIENS
+async function findPlaces(category = 'resto', filter = 'all') {
+    const endCity = document.getElementById('cityEnd').value;
+    if (!endCity) {
+        alert(currentLang === 'fr' ? "Indique d'abord ta destination." : "Please select a destination first.");
+        return;
+    }
+
+    const panel = document.getElementById('search-results-panel');
+    const listDiv = document.getElementById('results-list');
+    const titleEl = document.getElementById('search-results-title');
+    const bannerEl = document.getElementById('external-link-banner');
+    const filtersEl = document.getElementById('resto-filters');
+
+    panel.style.display = 'block';
+    filtersEl.style.display = category === 'resto' ? 'flex' : 'none';
+
+    if (category === 'activ') {
+        titleEl.innerText = "🎟️ Activités & Visites";
+        const gygUrl = `https://www.getyourguide.fr/s/?q=${encodeURIComponent(endCity)}`;
+        bannerEl.innerHTML = `
+            <a href="${gygUrl}" target="_blank" class="btn-main" style="background:#ff5533; text-decoration:none;">
+                🎟️ Chercher des billets sur GetYourGuide (${endCity}) ↗
+            </a>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px; text-align:center;">Ou choisis parmi les lieux ci-dessous :</div>
+        `;
+    } else {
+        titleEl.innerText = "🍴 Restaurants & Cafés";
+        const tripUrl = `https://www.tripadvisor.fr/Search?q=${encodeURIComponent(endCity)}`;
+        bannerEl.innerHTML = `
+            <a href="${tripUrl}" target="_blank" class="btn-main" style="background:#00af87; text-decoration:none;">
+                🍴 Voir sur TripAdvisor (${endCity}) ↗
+            </a>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px; text-align:center;">Ou explore les cartes aux alentours :</div>
+        `;
+    }
+
+    if (!markers['end']) {
+        listDiv.innerHTML = `<p style="padding:10px; font-size:0.8rem; color:var(--text-muted);">Sélectionne la ville dans la recherche pour charger les lieux sur la carte.</p>`;
+        return;
+    }
+
     const lat = markers['end'].getLatLng().lat;
     const lng = markers['end'].getLatLng().lng;
 
-    listDiv.innerHTML = `<div style="display:flex; align-items:center; padding:20px;"><div class="spinner"></div> ${currentLang === 'fr' ? 'Recherche...' : 'Searching...'}</div>`;
-    resultsDiv.style.display = 'block';
+    listDiv.innerHTML = `<div style="display:flex; align-items:center; padding:15px;"><div class="spinner"></div> Recherche...</div>`;
 
     let overpassFilter = category === 'resto' 
         ? `node["amenity"~"restaurant|cafe"]${filter !== 'all' ? `["cuisine"~"${filter}"]` : ''}(around:3000,${lat},${lng});`
@@ -284,8 +364,8 @@ async function findPlaces(category = 'resto', filter = 'all') {
         const data = await response.json();
         listDiv.innerHTML = "";
 
-        if (data.elements.length === 0) {
-            listDiv.innerHTML = `<p style="padding:10px; font-size:0.8rem;">Aucun résultat trouvé.</p>`;
+        if (!data.elements || data.elements.length === 0) {
+            listDiv.innerHTML = `<p style="padding:10px; font-size:0.8rem;">Aucun lieu trouvé à proximité.</p>`;
             return;
         }
 
@@ -294,22 +374,22 @@ async function findPlaces(category = 'resto', filter = 'all') {
             const sub = item.tags.cuisine || item.tags.tourism || "";
             const btn = document.createElement('button');
             btn.className = "btn-api";
-            btn.style = "text-align:left; background:var(--card-bg); width:100%; margin-bottom:5px; justify-content:space-between; color:var(--text-main); border:1px solid var(--border-color);";
-            btn.innerHTML = `<span><strong>${name}</strong><br><small style="color:var(--text-muted);">${sub}</small></span><span style="color:var(--accent); font-weight:bold;">+</span>`;
+            btn.style = "text-align:left; background:var(--bg-app); width:100%; justify-content:space-between; color:var(--text-main); border:1px solid var(--border-color);";
+            btn.innerHTML = `<span><strong>${name}</strong><br><small style="color:var(--text-muted);">${sub}</small></span><span style="color:var(--accent); font-weight:bold;">+ Ajouter</span>`;
             btn.onclick = () => {
                 addBlock(category === 'resto' ? 'resto' : 'activ', name, item.lat, item.lon);
-                btn.innerHTML = "✅";
+                btn.innerHTML = "✅ Ajouté";
                 btn.disabled = true;
             };
             listDiv.appendChild(btn);
         });
-    } catch (e) { listDiv.innerHTML = "Erreur de chargement."; }
+    } catch (e) { listDiv.innerHTML = "Erreur de chargement des lieux."; }
 }
 
 function findRestaurants(filter = 'all') { findPlaces('resto', filter); }
 function findActivities() { findPlaces('activ', 'all'); }
 
-// 6. CARTE ET MARQUEURS INTERACTIFS AVEC LIEN GOOGLE MAPS
+// 7. CARTE ET MARQUEURS INTERACTIFS AVEC LIEN GOOGLE MAPS
 function updateMapMarkers() {
     itemMarkers.forEach(m => map.removeLayer(m));
     itemMarkers = [];
@@ -370,7 +450,7 @@ async function restoreMapMarkers() {
 
 function delB(id) { tripData[activeDay] = tripData[activeDay].filter(x => x.id !== id); renderBlocks(); save(); }
 
-// 7. FONCTIONS ANNEXES
+// 8. FONCTIONS ANNEXES
 function toggleLang() {
     currentLang = currentLang === 'fr' ? 'en' : 'fr';
     applyLang(); generateTimeline(); save();
@@ -388,8 +468,8 @@ function initDates() {
 
 function applyLang() { 
     const texts = { 
-        fr: { title: "Explorez le monde ✈️", subtitle: "Préparez votre itinéraire sur-mesure", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL DU VOYAGE", budget: "Budget estimé :", pdf: "📄 Télécharger en PDF", vol: "Vol / Transport", hotel: "Hôtel", activ: "Activité", resto: "Restaurant", pax: "VOYAGEURS" }, 
-        en: { title: "Explore the World ✈️", subtitle: "Plan your custom itinerary", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TRIP TOTAL", budget: "Estimated budget:", pdf: "📄 Download PDF", vol: "Flight / Transit", hotel: "Hotel", activ: "Activity", resto: "Restaurant", pax: "TRAVELERS" } 
+        fr: { title: "Explorez le monde ✈️", subtitle: "Préparez votre itinéraire sur-mesure", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL DU VOYAGE", budget: "Budget estimé :", pdf: "📄 Télécharger en PDF", vol: "Chercher Vol / Transport (Skyscanner)", hotel: "Chercher Hôtel (Booking)", activ: "Activités & Visites", resto: "Restaurants & Cafés", pax: "VOYAGEURS" }, 
+        en: { title: "Explore the World ✈️", subtitle: "Plan your custom itinerary", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TRIP TOTAL", budget: "Estimated budget:", pdf: "📄 Download PDF", vol: "Search Flights / Transit (Skyscanner)", hotel: "Search Hotels (Booking)", activ: "Activities & Tours", resto: "Restaurants & Cafes", pax: "TRAVELERS" } 
     }; 
     const t = texts[currentLang]; 
     document.getElementById('txt-title').innerText = t.title; 
