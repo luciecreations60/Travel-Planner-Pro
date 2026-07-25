@@ -6,7 +6,7 @@ let markers = {};
 let itemMarkers = [];
 let draggedItemIndex = null;
 
-// 1. INITIALISATION ET CARTE
+// 1. INITIALISATION CARTE LEAFLET
 function initMap(center = [46, 2], zoom = 3) {
     if(map) map.remove();
     map = L.map('map').setView(center, zoom);
@@ -16,7 +16,7 @@ function initMap(center = [46, 2], zoom = 3) {
         ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
         : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
-    L.tileLayer(tileUrl, { attribution: '&copy; CARTO' }).addTo(map);
+    L.tileLayer(tileUrl, { attribution: '&copy; OpenStreetMap' }).addTo(map);
     if(isDark) document.body.classList.add('dark-mode');
 }
 
@@ -31,7 +31,7 @@ window.onload = () => {
     restoreMapMarkers();
 };
 
-// 2. GESTION DU MODE SOMBRE
+// 2. MODE SOMBRE
 function toggleDarkMode() {
     const body = document.body;
     const isDark = body.classList.toggle('dark-mode');
@@ -44,10 +44,10 @@ function toggleDarkMode() {
         ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
         : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
     
-    L.tileLayer(tileUrl, { attribution: '&copy; CARTO' }).addTo(map);
+    L.tileLayer(tileUrl, { attribution: '&copy; OpenStreetMap' }).addTo(map);
 }
 
-// 3. SAUVEGARDE ET CALCULS AVEC REMBOURSEMENTS SPLITWISE
+// 3. SAUVEGARDE & CALCULS
 function save() {
     localStorage.setItem('travelPlannerData', JSON.stringify(tripData));
     ['dateStart', 'dateEnd', 'cityStart', 'cityEnd', 'currency', 'budgetMax', 'pax', 'polarstepsUrl'].forEach(f => {
@@ -99,13 +99,13 @@ function updateTotal() {
     recapList.innerHTML = `
         <div class="recap-item"><strong>Part par personne (${pax} pers.) :</strong> <span><strong>${perPerson.toFixed(2)}${cur}</strong></span></div>
         <hr style="border:0; border-top:1px solid var(--border-color); margin:5px 0;">
-        <div class="recap-item"><small><span class="recap-dot" style="background:#6366f1"></span>Vols / Transports</small> <span>${stats.vol.toFixed(2)}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#f59e0b"></span>Hébergements</small> <span>${stats.hotel.toFixed(2)}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#ec4899"></span>Activités</small> <span>${stats.activ.toFixed(2)}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#10b981"></span>Restaurants</small> <span>${stats.resto.toFixed(2)}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:var(--vol-color)"></span>Vols / Transports</small> <span>${stats.vol.toFixed(2)}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:var(--hotel-color)"></span>Hébergements</small> <span>${stats.hotel.toFixed(2)}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:var(--activ-color)"></span>Activités</small> <span>${stats.activ.toFixed(2)}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:var(--resto-color)"></span>Restaurants</small> <span>${stats.resto.toFixed(2)}${cur}</span></div>
     `;
 
-    // Équilibre des comptes (Qui a payé quoi)
+    // Équilibre des comptes
     const splitDiv = document.getElementById('split-summary');
     splitDiv.innerHTML = "";
 
@@ -115,9 +115,7 @@ function updateTotal() {
         Object.entries(paidByPerson).forEach(([person, amount]) => {
             let diff = amount - perPerson;
             let statusColor = diff >= 0 ? "#10b981" : "#ef4444";
-            let statusText = diff >= 0 
-                ? `+${diff.toFixed(2)}${cur}` 
-                : `${diff.toFixed(2)}${cur}`;
+            let statusText = diff >= 0 ? `+${diff.toFixed(2)}${cur}` : `${diff.toFixed(2)}${cur}`;
 
             splitDiv.innerHTML += `
                 <div style="display:flex; justify-content:space-between;">
@@ -128,18 +126,84 @@ function updateTotal() {
         });
     }
 
-    // Lien Polarsteps
     const polarUrl = document.getElementById('polarstepsUrl').value;
     const polarBtn = document.getElementById('btnPolarsteps');
-    if (polarUrl) {
-        polarBtn.href = polarUrl;
-        polarBtn.style.display = "inline-block";
-    } else {
-        polarBtn.style.display = "none";
+    if (polarUrl) { polarBtn.href = polarUrl; polarBtn.style.display = "inline-block"; } 
+    else { polarBtn.style.display = "none"; }
+}
+
+// 4. RECHERCHE INTERNE INTÉGRÉE (OPTION B - SANS LIEN EXTÉRIEUR)
+async function searchPlacesInApp() {
+    const query = document.getElementById('wanderQuery').value.trim();
+    const cityEnd = document.getElementById('cityEnd').value;
+
+    if (!query) return;
+
+    const panel = document.getElementById('search-results-panel');
+    const list = document.getElementById('results-list');
+    panel.style.display = 'block';
+    list.innerHTML = `<div style="display:flex; align-items:center; gap:8px; padding:10px;"><div class="spinner"></div> Recherche en cours...</div>`;
+
+    // Recherche avec Nominatim OpenStreetMap (Gratuit)
+    const searchQuery = cityEnd ? `${query}, ${cityEnd}` : query;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&accept-language=${currentLang}&q=${encodeURIComponent(searchQuery)}&limit=5`;
+
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        list.innerHTML = "";
+
+        if (data.length === 0) {
+            list.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted);">Aucun résultat trouvé pour "${query}".</p>`;
+            return;
+        }
+
+        data.forEach(place => {
+            let typeDetected = 'activ';
+            if (place.type === 'restaurant' || place.type === 'cafe' || place.type === 'fast_food') typeDetected = 'resto';
+            else if (place.type === 'hotel' || place.type === 'guest_house' || place.type === 'hostel') typeDetected = 'hotel';
+            else if (place.type === 'aeroway' || place.type === 'station') typeDetected = 'vol';
+
+            let div = document.createElement('div');
+            div.className = "place-card-result";
+            div.innerHTML = `
+                <div style="flex:1; padding-right:10px;">
+                    <strong style="font-size:0.85rem; display:block;">${place.display_name.split(',')[0]}</strong>
+                    <small style="font-size:0.75rem; color:var(--text-muted);">${place.display_name.split(',').slice(1, 3).join(',')}</small>
+                </div>
+                <button class="btn-main" style="width:auto; padding:6px 12px; font-size:0.75rem; background:var(--accent);" onclick="addBlock('${typeDetected}', '${place.display_name.split(',')[0].replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">
+                    + Ajouter
+                </button>
+            `;
+            list.appendChild(div);
+        });
+
+    } catch (e) {
+        list.innerHTML = `<p style="font-size:0.8rem; color:#ef4444;">Erreur lors de la recherche.</p>`;
     }
 }
 
-// 4. TIMELINE ET BLOCS AVEC DRAG & DROP
+// Filtres rapides pour la recherche automatique par catégorie
+async function filterPlaces(type) {
+    const cityEnd = document.getElementById('cityEnd').value;
+    if (!cityEnd) {
+        alert(currentLang === 'fr' ? "Renseigne d'abord une ville d'arrivée." : "Please fill in destination.");
+        return;
+    }
+
+    if (type === 'vol') document.getElementById('wanderQuery').value = "Gare ou Aéroport";
+    else if (type === 'hotel') document.getElementById('wanderQuery').value = "Hôtel";
+    else if (type === 'activ') document.getElementById('wanderQuery').value = "Musée ou Monument";
+    else if (type === 'resto') document.getElementById('wanderQuery').value = "Restaurant";
+
+    searchPlacesInApp();
+}
+
+function closeResults() {
+    document.getElementById('search-results-panel').style.display = 'none';
+}
+
+// 5. TIMELINE ET GESTION DES BLOCS
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -174,9 +238,8 @@ function addBlock(type, name = '', lat = null, lon = null) {
         time: '10:00', 
         notes: '',
         paidBy: 'Moi',
-        bookingUrl: '',
-        lat,
-        lon
+        lat: lat ? parseFloat(lat) : null,
+        lon: lon ? parseFloat(lon) : null
     }); 
     renderBlocks(); 
     save(); 
@@ -195,23 +258,20 @@ function renderBlocks() {
 
         let icon = b.type === 'vol' ? '✈️' : b.type === 'hotel' ? '🏨' : b.type === 'resto' ? '🍴' : '🎟️';
         
-        let extra = `<div style="margin-top:8px; display:grid; gap:5px;">
-            <div style="display:flex; gap:10px;">
+        div.innerHTML = `
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="cursor:grab; font-size:1.1rem; color:var(--text-muted);" title="Glisser pour déplacer">☰</span>
+                <input type="time" style="width:75px" value="${b.time}" onchange="updateB(${b.id}, 'time', this.value)">
+                <div style="font-size:1.2rem">${icon}</div>
+                <input type="text" style="flex:1; font-weight:bold;" value="${b.name}" placeholder="Nom du lieu" onchange="updateB(${b.id}, 'name', this.value)">
+                <input type="number" style="width:65px" value="${b.price}" oninput="updateB(${b.id}, 'price', this.value)">${cur}
+                <button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer; color:var(--text-muted);">✕</button>
+            </div>
+            <div style="margin-top:8px; display:flex; gap:10px;">
                 <input type="text" placeholder="${currentLang === 'fr' ? 'Notes / Adresse' : 'Notes / Address'}" value="${b.notes || ''}" style="flex:1;" onchange="updateB(${b.id}, 'notes', this.value)">
                 <input type="text" placeholder="Payé par" value="${b.paidBy || 'Moi'}" style="width:90px;" onchange="updateB(${b.id}, 'paidBy', this.value)">
             </div>
-            ${b.type === 'hotel' ? `<input type="text" placeholder="Lien de réservation" value="${b.bookingUrl || ''}" onchange="updateB(${b.id}, 'bookingUrl', this.value)">` : ''}
-        </div>`; 
-
-        div.innerHTML = `
-            <div style="display:flex; align-items:center; gap:8px;">
-                <span style="cursor:grab; font-size:1.1rem; color:var(--text-muted);" title="Glisser pour réordonner">☰</span>
-                <input type="time" style="width:75px" value="${b.time}" onchange="updateB(${b.id}, 'time', this.value)">
-                <div style="font-size:1.2rem">${icon}</div>
-                <input type="text" style="flex:1; font-weight:bold;" value="${b.name}" placeholder="Nom" onchange="updateB(${b.id}, 'name', this.value)">
-                <input type="number" style="width:65px" value="${b.price}" oninput="updateB(${b.id}, 'price', this.value)">${cur}
-                <button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer; color:var(--text-muted);">✕</button>
-            </div>${extra}`; 
+        `; 
 
         // Drag & Drop
         div.addEventListener('dragstart', (e) => {
@@ -259,137 +319,7 @@ async function updateB(id, f, v) {
     save(); 
 }
 
-// 5. FONCTIONS DE REDIRECTIONS EXTÉRIEURES (SKYSCANNER, BOOKING, GETYOURGUIDE)
-function openFlightSearch() {
-    const startCity = document.getElementById('cityStart').value;
-    const endCity = document.getElementById('cityEnd').value;
-    const startDate = document.getElementById('dateStart').value;
-
-    if (!startCity || !endCity) {
-        alert(currentLang === 'fr' ? "Indique une ville de départ et d'arrivée." : "Please fill in start and end cities.");
-        return;
-    }
-
-    let travelDate = startDate;
-    if (startDate) {
-        let d = new Date(startDate);
-        d.setDate(d.getDate() + (activeDay - 1));
-        travelDate = d.toISOString().split('T')[0];
-    }
-
-    const skyscannerUrl = `https://www.skyscanner.fr/transports/vols/${encodeURIComponent(startCity)}/${encodeURIComponent(endCity)}/${travelDate}/`;
-    window.open(skyscannerUrl, '_blank');
-
-    addBlock('vol', `Vol ${startCity} ➔ ${endCity}`);
-}
-
-function openHotelSearch() {
-    const endCity = document.getElementById('cityEnd').value;
-    const startDate = document.getElementById('dateStart').value;
-
-    if (!endCity) {
-        alert(currentLang === 'fr' ? "Indique d'abord ta destination." : "Please fill in destination.");
-        return;
-    }
-
-    let checkin = startDate;
-    if (startDate) {
-        let d = new Date(startDate);
-        d.setDate(d.getDate() + (activeDay - 1));
-        checkin = d.toISOString().split('T')[0];
-    }
-
-    const bookingUrl = `https://www.booking.com/searchresults.fr.html?ss=${encodeURIComponent(endCity)}&checkin=${checkin}`;
-    window.open(bookingUrl, '_blank');
-
-    addBlock('hotel', `Hôtel à ${endCity}`);
-}
-
-// 6. RECHERCHE ET SUGGESTIONS SUR CARTE & LIENS
-async function findPlaces(category = 'resto', filter = 'all') {
-    const endCity = document.getElementById('cityEnd').value;
-    if (!endCity) {
-        alert(currentLang === 'fr' ? "Indique d'abord ta destination." : "Please select a destination first.");
-        return;
-    }
-
-    const panel = document.getElementById('search-results-panel');
-    const listDiv = document.getElementById('results-list');
-    const titleEl = document.getElementById('search-results-title');
-    const bannerEl = document.getElementById('external-link-banner');
-    const filtersEl = document.getElementById('resto-filters');
-
-    panel.style.display = 'block';
-    filtersEl.style.display = category === 'resto' ? 'flex' : 'none';
-
-    if (category === 'activ') {
-        titleEl.innerText = "🎟️ Activités & Visites";
-        const gygUrl = `https://www.getyourguide.fr/s/?q=${encodeURIComponent(endCity)}`;
-        bannerEl.innerHTML = `
-            <a href="${gygUrl}" target="_blank" class="btn-main" style="background:#ff5533; text-decoration:none;">
-                🎟️ Chercher des billets sur GetYourGuide (${endCity}) ↗
-            </a>
-            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px; text-align:center;">Ou choisis parmi les lieux ci-dessous :</div>
-        `;
-    } else {
-        titleEl.innerText = "🍴 Restaurants & Cafés";
-        const tripUrl = `https://www.tripadvisor.fr/Search?q=${encodeURIComponent(endCity)}`;
-        bannerEl.innerHTML = `
-            <a href="${tripUrl}" target="_blank" class="btn-main" style="background:#00af87; text-decoration:none;">
-                🍴 Voir sur TripAdvisor (${endCity}) ↗
-            </a>
-            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px; text-align:center;">Ou explore les cartes aux alentours :</div>
-        `;
-    }
-
-    if (!markers['end']) {
-        listDiv.innerHTML = `<p style="padding:10px; font-size:0.8rem; color:var(--text-muted);">Sélectionne la ville dans la recherche pour charger les lieux sur la carte.</p>`;
-        return;
-    }
-
-    const lat = markers['end'].getLatLng().lat;
-    const lng = markers['end'].getLatLng().lng;
-
-    listDiv.innerHTML = `<div style="display:flex; align-items:center; padding:15px;"><div class="spinner"></div> Recherche...</div>`;
-
-    let overpassFilter = category === 'resto' 
-        ? `node["amenity"~"restaurant|cafe"]${filter !== 'all' ? `["cuisine"~"${filter}"]` : ''}(around:3000,${lat},${lng});`
-        : `node["tourism"~"attraction|museum|viewpoint|gallery"](around:3000,${lat},${lng});`;
-
-    const query = `[out:json];${overpassFilter}out 10;`;
-    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-        listDiv.innerHTML = "";
-
-        if (!data.elements || data.elements.length === 0) {
-            listDiv.innerHTML = `<p style="padding:10px; font-size:0.8rem;">Aucun lieu trouvé à proximité.</p>`;
-            return;
-        }
-
-        data.elements.forEach(item => {
-            const name = item.tags.name || (category === 'resto' ? "Restaurant" : "Attraction");
-            const sub = item.tags.cuisine || item.tags.tourism || "";
-            const btn = document.createElement('button');
-            btn.className = "btn-api";
-            btn.style = "text-align:left; background:var(--bg-app); width:100%; justify-content:space-between; color:var(--text-main); border:1px solid var(--border-color);";
-            btn.innerHTML = `<span><strong>${name}</strong><br><small style="color:var(--text-muted);">${sub}</small></span><span style="color:var(--accent); font-weight:bold;">+ Ajouter</span>`;
-            btn.onclick = () => {
-                addBlock(category === 'resto' ? 'resto' : 'activ', name, item.lat, item.lon);
-                btn.innerHTML = "✅ Ajouté";
-                btn.disabled = true;
-            };
-            listDiv.appendChild(btn);
-        });
-    } catch (e) { listDiv.innerHTML = "Erreur de chargement des lieux."; }
-}
-
-function findRestaurants(filter = 'all') { findPlaces('resto', filter); }
-function findActivities() { findPlaces('activ', 'all'); }
-
-// 7. CARTE ET MARQUEURS INTERACTIFS AVEC LIEN GOOGLE MAPS
+// 6. GESTION DES MARQUEURS SUR LA CARTE
 function updateMapMarkers() {
     itemMarkers.forEach(m => map.removeLayer(m));
     itemMarkers = [];
@@ -399,10 +329,10 @@ function updateMapMarkers() {
             const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lon}`;
             const popupContent = `
                 <div style="font-family:sans-serif; text-align:center;">
-                    <strong style="font-size:1rem;">${b.name}</strong><br>
+                    <strong style="font-size:0.95rem;">${b.name}</strong><br>
                     <small>${b.notes || ''}</small><br><br>
-                    <a href="${googleMapsUrl}" target="_blank" style="background:#3b82f6; color:white; padding:5px 10px; border-radius:6px; text-decoration:none; font-size:0.8rem;">
-                        🗺️ Ouvrir dans Google Maps
+                    <a href="${googleMapsUrl}" target="_blank" style="background:#3b82f6; color:white; padding:4px 8px; border-radius:6px; text-decoration:none; font-size:0.75rem;">
+                        🗺️ Voir dans Google Maps
                     </a>
                 </div>
             `;
@@ -450,11 +380,8 @@ async function restoreMapMarkers() {
 
 function delB(id) { tripData[activeDay] = tripData[activeDay].filter(x => x.id !== id); renderBlocks(); save(); }
 
-// 8. FONCTIONS ANNEXES
-function toggleLang() {
-    currentLang = currentLang === 'fr' ? 'en' : 'fr';
-    applyLang(); generateTimeline(); save();
-}
+// 7. FONCTIONS ANNEXES
+function toggleLang() { currentLang = currentLang === 'fr' ? 'en' : 'fr'; applyLang(); generateTimeline(); save(); }
 
 function initDates() { 
     const start = document.getElementById('dateStart').value; 
@@ -468,8 +395,8 @@ function initDates() {
 
 function applyLang() { 
     const texts = { 
-        fr: { title: "Explorez le monde ✈️", subtitle: "Préparez votre itinéraire sur-mesure", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL DU VOYAGE", budget: "Budget estimé :", pdf: "📄 Télécharger en PDF", vol: "Chercher Vol / Transport (Skyscanner)", hotel: "Chercher Hôtel (Booking)", activ: "Activités & Visites", resto: "Restaurants & Cafés", pax: "VOYAGEURS" }, 
-        en: { title: "Explore the World ✈️", subtitle: "Plan your custom itinerary", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TRIP TOTAL", budget: "Estimated budget:", pdf: "📄 Download PDF", vol: "Search Flights / Transit (Skyscanner)", hotel: "Search Hotels (Booking)", activ: "Activities & Tours", resto: "Restaurants & Cafes", pax: "TRAVELERS" } 
+        fr: { title: "Explorez le monde ✈️", subtitle: "Préparez votre itinéraire sur-mesure", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL DU VOYAGE", budget: "Budget estimé :", pdf: "📄 Télécharger en PDF", pax: "VOYAGEURS" }, 
+        en: { title: "Explore the World ✈️", subtitle: "Plan your custom itinerary", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TRIP TOTAL", budget: "Estimated budget:", pdf: "📄 Download PDF", pax: "TRAVELERS" } 
     }; 
     const t = texts[currentLang]; 
     document.getElementById('txt-title').innerText = t.title; 
@@ -483,10 +410,6 @@ function applyLang() {
     document.getElementById('txt-total-lbl').innerText = t.total; 
     document.getElementById('txt-budget-lbl').innerText = t.budget; 
     document.getElementById('btn-pdf').innerText = t.pdf; 
-    document.querySelectorAll('.t-vol').forEach(el => el.innerText = t.vol); 
-    document.querySelectorAll('.t-hotel').forEach(el => el.innerText = t.hotel); 
-    document.querySelectorAll('.t-activ').forEach(el => el.innerText = t.activ); 
-    document.querySelectorAll('.t-resto').forEach(el => el.innerText = t.resto);
     renderBlocks(); 
 }
 
