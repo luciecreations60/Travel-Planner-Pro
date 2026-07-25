@@ -1,25 +1,150 @@
-<div class="app-container">
-  <!-- Section Carte (1/3 de la page) -->
-  <section class="map-section">
-    <div id="map"><!-- Composant Carte --></div>
-  </section>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Travel Planner</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
 
-  <!-- Section Recherche & Filtres -->
-  <section class="search-section">
-    <input type="text" id="search-input" placeholder="Rechercher..." />
-    <button id="search-btn">Rechercher</button>
-  </section>
+    <!-- HERO HEADER -->
+    <div class="hero">
+        <div style="position: absolute; top: 15px; right: 20px; display: flex; gap: 10px;">
+            <button class="lang-switch" onclick="toggleDarkMode()" id="dark-btn">🌙</button>
+            <button class="lang-switch" onclick="toggleLang()">FR / EN</button>
+        </div>
+        <h1 id="txt-title">Explorez le monde ✈️</h1>
+        <p id="txt-subtitle">Préparez votre itinéraire sur-mesure</p>
+    </div>
 
-  <!-- Section Budget & Résultats (2/3 restants) -->
-  <section class="content-section">
-    <div class="budget-card">
-      <h3>Budget</h3>
-      <!-- Détails du budget -->
+    <!-- BARRE DE CONFIGURATION -->
+    <div class="search-bar">
+        <div>
+            <label id="lbl-start" style="font-size:0.7rem; font-weight:bold; display:block;">DÉPART</label>
+            <input type="text" id="cityStart" placeholder="Ex: Paris" oninput="handleSearch(this.value, 'start')">
+            <div id="suggestionsStart" class="suggest-box" style="display:none;"></div>
+        </div>
+        <div>
+            <label id="lbl-end" style="font-size:0.7rem; font-weight:bold; display:block;">ARRIVÉE</label>
+            <input type="text" id="cityEnd" placeholder="Ex: Rome" oninput="handleSearch(this.value, 'end')">
+            <div id="suggestionsEnd" class="suggest-box" style="display:none;"></div>
+        </div>
+        <div>
+            <label id="lbl-from" style="font-size:0.7rem; font-weight:bold; display:block;">DU</label>
+            <input type="date" id="dateStart" onchange="initDates()">
+        </div>
+        <div>
+            <label id="lbl-to" style="font-size:0.7rem; font-weight:bold; display:block;">AU</label>
+            <input type="date" id="dateEnd" onchange="generateTimeline()">
+        </div>
+        <div>
+            <label id="lbl-cur" style="font-size:0.7rem; font-weight:bold; display:block;">DEVISE</label>
+            <select id="currency" onchange="saveAndRefresh()">
+                <option value="€">€ (EUR)</option>
+                <option value="$">$ (USD)</option>
+                <option value="£">£ (GBP)</option>
+            </select>
+        </div>
+        <div>
+            <label id="lbl-pax" style="font-size:0.7rem; font-weight:bold; display:block;">VOYAGEURS</label>
+            <input type="number" id="pax" value="1" min="1" style="width:50px;" onchange="saveAndRefresh()">
+        </div>
+        <div>
+            <label style="font-size:0.7rem; font-weight:bold; display:block;">POLARSTEPS</label>
+            <input type="url" id="polarstepsUrl" placeholder="Lien Polarsteps" onchange="saveAndRefresh()" style="width:130px;">
+            <a id="btnPolarsteps" href="#" target="_blank" style="display:none; font-size:0.8rem; text-decoration:none; margin-left:5px;">📍 Voir</a>
+        </div>
     </div>
-    
-    <div class="results-list">
-      <h3>Résultats</h3>
-      <!-- Les résultats s'affichent ici -->
+
+    <!-- CONTENEUR PRINCIPAL -->
+    <div class="main-container">
+        
+        <!-- COLONNE GAUCHE : TIMELINE & ACTIONS -->
+        <div class="column">
+            <div class="timeline scrollable">
+                <h3 style="margin-top:0;">🗓️ Itinéraire</h3>
+                <div id="timelineArea"></div>
+                
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+                
+                <div class="btn-group">
+                    <button class="btn-main" onclick="clearAll()" style="background: #ef4444;">🗑️ Tout effacer</button>
+                    <button class="btn-main" onclick="downloadData()" style="background: #3b82f6;">💾 Sauvegarder</button>
+                    <button class="btn-main" onclick="toggleFocus()" style="background: #64748b;">
+                        <span id="focus-icon">🔼</span> 
+                        <span id="focus-text">Masquer l'en-tête</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLONNE CENTRALE : PLANIFICATEUR DU JOUR -->
+        <div class="column scrollable">
+            <h2 id="currentDayTitle">Jour 1</h2>
+            
+            <!-- BARRE DE RECHERCHE D'ÉTABLISSEMENTS À LA WANDERLOG -->
+            <div class="wander-search-box">
+                <input type="text" id="wanderQuery" placeholder="🔎 Rechercher un lieu, resto, hôtel, musée..." onkeyup="if(event.key==='Enter') searchPlacesInApp()">
+                <button onclick="searchPlacesInApp()" class="btn-main" style="width:auto; padding:8px 15px; background:var(--accent);">Chercher</button>
+            </div>
+
+            <!-- FILTRES RAPIDES INTERNES -->
+            <div class="quick-filters">
+                <button class="chip chip-vol" onclick="filterPlaces('vol')">✈️ Transports</button>
+                <button class="chip chip-hotel" onclick="filterPlaces('hotel')">🏨 Hôtels</button>
+                <button class="chip chip-activ" onclick="filterPlaces('activ')">🎟️ Activités</button>
+                <button class="chip chip-resto" onclick="filterPlaces('resto')">🍴 Restaurants</button>
+            </div>
+
+            <!-- PANNEAU DE RÉSULTATS DE RECHERCHE -->
+            <div id="search-results-panel" style="display:none;" class="results-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0;" id="search-results-title">Résultats</h4>
+                    <button onclick="closeResults()" style="border:none; background:none; cursor:pointer; font-weight:bold; color:var(--text-main);">✕</button>
+                </div>
+                <div id="results-list" style="display:grid; gap:8px;"></div>
+            </div>
+
+            <!-- Liste des événements du jour -->
+            <div id="blocksList"></div>
+        </div>
+
+        <!-- COLONNE DROITE : CARTE EN HAUT (1/3) + BUDGET & RÉCAP EN BAS -->
+        <div class="column sidebar">
+            <!-- CARTE LEAFLET (1/3 DE LA HAUTEUR) -->
+            <div id="map"></div>
+
+            <!-- CARTE BUDGET -->
+            <div class="budget-card">
+                <small id="txt-total-lbl">TOTAL DU VOYAGE</small>
+                <h1 id="totalLabel" style="margin:5px 0;">0€</h1>
+                <div style="font-size:0.8rem; opacity:0.9;">
+                    <span id="txt-budget-lbl">Budget estimé :</span> 
+                    <input type="number" id="budgetMax" style="width:70px; background:rgba(255,255,255,0.2); border:none; color:white; font-weight:bold; text-align:center;" oninput="saveAndRefresh()">
+                    <span class="cur-symbol">€</span>
+                </div>
+                <div id="alertLimit" style="display:none; color:#fca5a5; font-weight:bold; font-size:0.8rem; margin-top:5px;">⚠️ Budget dépassé !</div>
+            </div>
+
+            <!-- RÉCAPITULATIF & ÉQUILIBRE -->
+            <div class="timeline recap-card">
+                <div id="recap-list" style="display:grid; gap:8px;"></div>
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:15px 0;">
+                <h4 style="margin:0 0 10px 0; color:var(--text-main);">⚖️ Équilibre des comptes</h4>
+                <div id="split-summary" style="display:grid; gap:6px; font-size:0.85rem;"></div>
+                <button class="btn-main" id="btn-pdf" onclick="exportPDF()" style="background:#10b981; margin-top:15px;">📄 Télécharger en PDF</button>
+            </div>
+        </div>
+
     </div>
-  </section>
-</div>
+
+    <!-- Scripts CDN -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
