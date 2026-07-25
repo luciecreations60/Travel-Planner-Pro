@@ -3,202 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mon Travel Planner</title>
+    <title>Planificateur de Voyage</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <!-- HERO HEADER -->
+    <!-- HEADER -->
     <div class="hero">
-        <div style="position: absolute; top: 15px; right: 20px; display: flex; gap: 10px;">
-            <button class="lang-switch" onclick="toggleDarkMode()" id="dark-btn">🌙</button>
+        <div class="top-controls">
+            <button class="lang-switch" onclick="toggleDarkMode()">🌙</button>
             <button class="lang-switch" onclick="toggleLang()">FR / EN</button>
         </div>
-        <h1 id="txt-title">Explorez le monde ✈️</h1>
-        <p id="txt-subtitle">Préparez votre itinéraire sur-mesure</p>
+        <h1>Explorez le monde ✈️</h1>
+        <p>Préparez votre itinéraire sur-mesure</p>
     </div>
 
-    <!-- BARRE DE CONFIGURATION DE VOYAGE -->
+    <!-- BARRE DE CONFIGURATION -->
     <div class="search-bar">
         <div>
-            <label style="font-size:0.7rem; font-weight:bold; display:block;">DÉPART</label>
-            <input type="text" id="cityStart" placeholder="Ex: Paris" oninput="handleSearch(this.value, 'start')">
-            <div id="suggestionsStart" class="suggest-box" style="display:none;"></div>
+            <label>DÉPART</label>
+            <input type="text" id="cityStart" placeholder="Ex: Paris">
         </div>
         <div>
-            <label style="font-size:0.7rem; font-weight:bold; display:block;">ARRIVÉE (DESTINATION)</label>
-            <input type="text" id="cityEnd" placeholder="Ex: Ajaccio" oninput="handleSearch(this.value, 'end')">
-            <div id="suggestionsEnd" class="suggest-box" style="display:none;"></div>
+            <label>ARRIVÉE</label>
+            <input type="text" id="cityEnd" placeholder="Ex: Ajaccio">
         </div>
         <div>
-            <label style="font-size:0.7rem; font-weight:bold; display:block;">DU</label>
-            <input type="date" id="dateStart" onchange="initDates()">
+            <label>DU</label>
+            <input type="date" id="dateStart" onchange="generateTimeline()">
         </div>
         <div>
-            <label style="font-size:0.7rem; font-weight:bold; display:block;">AU</label>
+            <label>AU</label>
             <input type="date" id="dateEnd" onchange="generateTimeline()">
         </div>
         <div>
-            <label style="font-size:0.7rem; font-weight:bold; display:block;">DEVISE</label>
+            <label>DEVISE</label>
             <select id="currency" onchange="saveAndRefresh()">
                 <option value="€">€ (EUR)</option>
                 <option value="$">$ (USD)</option>
             </select>
         </div>
         <div>
-            <label style="font-size:0.7rem; font-weight:bold; display:block;">VOYAGEURS</label>
+            <label>VOYAGEURS</label>
             <input type="number" id="pax" value="1" min="1" style="width:50px;" onchange="saveAndRefresh()">
         </div>
     </div>
 
-    <!-- CONTENEUR PRINCIPAL -->
+    <!-- MAIN CONTAINER -->
     <div class="main-container">
         
-        <!-- COLONNE GAUCHE : TIMELINE & ACTIONS -->
+        <!-- COLONNE GAUCHE : ITINÉRAIRE JOUR PAR JOUR -->
         <div class="column">
             <div class="timeline scrollable">
-                <h3 style="margin-top:0;">🗓️ Itinéraire</h3>
+                <h3>🗓️ Itinéraire</h3>
                 <div id="timelineArea"></div>
-                <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+                <hr class="separator">
                 <div class="btn-group">
-                    <button class="btn-main" onclick="clearAll()" style="background: #ef4444;">🗑️ Tout effacer</button>
-                    <button class="btn-main" onclick="downloadData()" style="background: #3b82f6;">💾 Sauvegarder</button>
+                    <button class="btn-main btn-danger" onclick="clearAll()">🗑️ Tout effacer</button>
+                    <button class="btn-main btn-primary" onclick="downloadData()">💾 Sauvegarder</button>
                 </div>
             </div>
         </div>
 
-        <!-- COLONNE CENTRALE : DÉTAIL DU JOUR ET MODULES -->
+        <!-- COLONNE CENTRALE : MODULE DE RECHERCHE ET ÉVÉNEMENTS -->
         <div class="column scrollable">
             <h2 id="currentDayTitle">Jour 1</h2>
             
-            <!-- PANNEAU RECHERCHE AVEC DISTANCE EN KM -->
-            <div class="wander-search-box" style="flex-wrap: wrap;">
-                <input type="text" id="wanderQuery" placeholder="🔎 Lieu, restaurant, hôtel..." style="flex:2; min-width:180px;" onkeyup="if(event.key==='Enter') searchPlacesInApp()">
-                <div style="display:flex; align-items:center; gap:5px;">
-                    <label style="font-size:0.75rem; font-weight:600;">Rayon:</label>
-                    <select id="searchRadius" style="padding:10px;">
+            <!-- RECHERCHE PAR KM -->
+            <div class="wander-search-box">
+                <input type="text" id="wanderQuery" placeholder="🔎 Chercher un lieu, resto, hôtel..." onkeyup="if(event.key==='Enter') searchPlacesInApp()">
+                <div class="radius-selector">
+                    <label>Rayon :</label>
+                    <select id="searchRadius">
                         <option value="5">5 km</option>
                         <option value="15" selected>15 km</option>
                         <option value="30">30 km</option>
                         <option value="50">50 km</option>
                     </select>
                 </div>
-                <button onclick="searchPlacesInApp()" class="btn-main" style="width:auto; padding:8px 15px; background:var(--accent);">Chercher</button>
+                <button onclick="searchPlacesInApp()" class="btn-search">Chercher</button>
             </div>
 
-            <!-- FILTRES RAPIDES ET AJOUT DE TRANSPORT -->
+            <!-- FILTRES / ACTIONS ÉPURÉES ET COLORÉES -->
             <div class="quick-filters">
-                <button class="chip chip-hotel" onclick="openHotelModal()">🏨 + Hébergement (Multi-jours)</button>
-                <button class="chip chip-vol" onclick="toggleTransportMenu()">🚆 + Transport (Ferries, Bus, Train...)</button>
-                <button class="chip chip-activ" onclick="filterPlaces('activ')">🎟️ Activités</button>
-                <button class="chip chip-resto" onclick="filterPlaces('resto')">🍴 Restaurants</button>
+                <button class="chip chip-hotel" onclick="openHotelModal()">🏨 Hébergement</button>
+                <button class="chip chip-vol" onclick="toggleTransportMenu()">🚆 Transport</button>
+                <button class="chip chip-activ" onclick="openQuickAddModal('activ')">🎟️ Activités</button>
+                <button class="chip chip-resto" onclick="openQuickAddModal('resto')">🍴 Restaurants</button>
             </div>
 
-            <!-- DROPDOWN CHOIX DU TRANSPORT (AVEC ICONES COMME CAPTURE) -->
+            <!-- DROPDOWN TRANSPORT -->
             <div id="transportMenu" class="transport-dropdown" style="display:none;">
                 <div class="transport-opt" onclick="openTransportModal('Bus', '🚌')">🚌 Bus</div>
                 <div class="transport-opt" onclick="openTransportModal('Train', '🚆')">🚆 Train</div>
-                <div class="transport-opt" onclick="openTransportModal('Ferry', '⛴️')">⛴️ Ferry / Bateau</div>
+                <div class="transport-opt" onclick="openTransportModal('Ferry', '⛴️')">⛴️ Ferry</div>
                 <div class="transport-opt" onclick="openTransportModal('Avion', '✈️')">✈️ Avion</div>
-                <div class="transport-opt" onclick="openTransportModal('Voiture', '🚗')">🚗 Voiture / Location</div>
+                <div class="transport-opt" onclick="openTransportModal('Voiture', '🚗')">🚗 Voiture</div>
             </div>
 
-            <!-- PANNEAU DE RÉSULTATS DE RECHERCHE -->
-            <div id="search-results-panel" style="display:none;" class="results-panel">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h4 style="margin:0;">Résultats à proximité</h4>
-                    <button onclick="closeResults()" style="border:none; background:none; cursor:pointer;">✕</button>
+            <!-- RÉSULTATS DE RECHERCHE -->
+            <div id="search-results-panel" class="results-panel" style="display:none;">
+                <div class="results-header">
+                    <h4>Résultats de recherche</h4>
+                    <button onclick="closeResults()">✕</button>
                 </div>
-                <div id="results-list" style="display:grid; gap:8px;"></div>
+                <div id="results-list"></div>
             </div>
 
-            <!-- Liste des événements / cartes du jour -->
+            <!-- LISTE DES ÉVÉNEMENTS DU JOUR SELECTIONNÉ -->
             <div id="blocksList"></div>
         </div>
 
-        <!-- COLONNE DROITE : CARTE EN HAUT (1/3) + BUDGET -->
-        <div class="column sidebar">
+        <!-- COLONNE DROITE : CARTE & RÉSUMÉ PAR CATÉGORIES -->
+        <div class="column sidebar scrollable">
             <div id="map"></div>
+            <small style="text-align:center; color:var(--text-muted); font-size:0.75rem;">💡 Cliquez sur la carte pour ajouter un point d'intérêt</small>
 
             <div class="budget-card">
-                <small id="txt-total-lbl">TOTAL DU VOYAGE</small>
-                <h1 id="totalLabel" style="margin:5px 0;">0€</h1>
-                <div style="font-size:0.8rem; opacity:0.9;">
-                    <span>Budget estimé :</span> 
-                    <input type="number" id="budgetMax" style="width:70px; background:rgba(255,255,255,0.2); border:none; color:white; font-weight:bold; text-align:center;" oninput="saveAndRefresh()">
-                    <span>€</span>
+                <small>TOTAL DU VOYAGE</small>
+                <h1 id="totalLabel">0€</h1>
+            </div>
+
+            <!-- RÉSUMÉ PAR CATÉGORIES -->
+            <div class="categories-recap">
+                <h3>🗂️ Synthèse par Catégories</h3>
+                
+                <div class="cat-section">
+                    <div class="cat-header cat-hotel">
+                        <span>🏨 Hébergements</span>
+                        <button onclick="openHotelModal()">+</button>
+                    </div>
+                    <div id="cat-list-hotel" class="cat-list"></div>
+                </div>
+
+                <div class="cat-section">
+                    <div class="cat-header cat-vol">
+                        <span>🚆 Transports</span>
+                        <button onclick="toggleTransportMenu()">+</button>
+                    </div>
+                    <div id="cat-list-vol" class="cat-list"></div>
+                </div>
+
+                <div class="cat-section">
+                    <div class="cat-header cat-activ">
+                        <span>🎟️ Activités</span>
+                        <button onclick="openQuickAddModal('activ')">+</button>
+                    </div>
+                    <div id="cat-list-activ" class="cat-list"></div>
+                </div>
+
+                <div class="cat-section">
+                    <div class="cat-header cat-resto">
+                        <span>🍴 Restaurants</span>
+                        <button onclick="openQuickAddModal('resto')">+</button>
+                    </div>
+                    <div id="cat-list-resto" class="cat-list"></div>
                 </div>
             </div>
 
-            <div class="timeline recap-card">
-                <div id="recap-list" style="display:grid; gap:8px;"></div>
-                <hr style="border:0; border-top:1px solid var(--border-color); margin:15px 0;">
-                <h4 style="margin:0 0 10px 0;">⚖️ Équilibre des comptes</h4>
-                <div id="split-summary" style="display:grid; gap:6px; font-size:0.85rem;"></div>
-            </div>
         </div>
 
     </div>
 
-    <!-- MODAL : AJOUT D'HÔTEL MULTI-JOURS -->
+    <!-- MODAL : HÔTEL MULTI-JOURS -->
     <div id="hotelModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3>🏨 Ajouter un Hébergement</h3>
             <label>Nom de l'établissement</label>
             <input type="text" id="hotelName" placeholder="Ex: Camping L'esplanade">
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <div style="flex:1;">
-                    <label>Check-in (Arrivée)</label>
+            <div class="grid-2">
+                <div>
+                    <label>Check-in</label>
                     <input type="date" id="hotelStart">
                 </div>
-                <div style="flex:1;">
-                    <label>Check-out (Départ)</label>
+                <div>
+                    <label>Check-out</label>
                     <input type="date" id="hotelEnd">
                 </div>
             </div>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <div style="flex:1;">
+            <div class="grid-2">
+                <div>
                     <label>Prix Total</label>
                     <input type="number" id="hotelPrice" placeholder="0">
                 </div>
-                <div style="flex:1;">
+                <div>
                     <label>Payé par</label>
                     <input type="text" id="hotelPayer" value="Moi">
                 </div>
             </div>
-            <div style="margin-top:15px; display:flex; gap:10px; justify-end;">
-                <button onclick="closeModal('hotelModal')" class="btn-main" style="background:#64748b;">Annuler</button>
-                <button onclick="saveHotel()" class="btn-main" style="background:var(--accent);">Ajouter au planning</button>
+            <div class="modal-actions">
+                <button onclick="closeModal('hotelModal')" class="btn-main btn-secondary">Annuler</button>
+                <button onclick="saveHotel()" class="btn-main btn-hotel">Enregistrer</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL : AJOUT DE TRANSPORT DÉTAILLÉ (STYLE CAPTURE D'ÉCRAN) -->
+    <!-- MODAL : TRANSPORT -->
     <div id="transportModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3 id="transportModalTitle">🚆 Ajouter un Transport</h3>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="grid-2">
                 <div>
                     <label>Lieu de Départ</label>
-                    <input type="text" id="transFrom" placeholder="Ex: Mâcon Nord Hotel">
+                    <input type="text" id="transFrom" placeholder="Ex: Nice">
                 </div>
                 <div>
                     <label>Lieu d'Arrivée</label>
-                    <input type="text" id="transTo" placeholder="Ex: Ferries Nice">
+                    <input type="text" id="transTo" placeholder="Ex: Ajaccio">
                 </div>
                 <div>
-                    <label>Date & Heure de Départ</label>
+                    <label>Départ (Date/Heure)</label>
                     <input type="datetime-local" id="transDateStart">
                 </div>
                 <div>
-                    <label>Date & Heure d'Arrivée</label>
+                    <label>Arrivée (Date/Heure)</label>
                     <input type="datetime-local" id="transDateEnd">
                 </div>
                 <div>
-                    <label>Transporteur / Compagnie</label>
-                    <input type="text" id="transCompany" placeholder="Ex: Corsica Ferries / SNCF">
+                    <label>Compagnie</label>
+                    <input type="text" id="transCompany" placeholder="Ex: Corsica Ferries">
                 </div>
                 <div>
                     <label>N° Confirmation</label>
@@ -206,23 +231,49 @@
                 </div>
                 <div>
                     <label>Coût</label>
-                    <input type="number" id="transCost" placeholder="155">
+                    <input type="number" id="transCost" placeholder="0">
                 </div>
                 <div>
                     <label>Payé par</label>
                     <input type="text" id="transPayer" value="Moi">
                 </div>
             </div>
-            <div style="margin-top:15px; display:flex; gap:10px; justify-end;">
-                <button onclick="closeModal('transportModal')" class="btn-main" style="background:#64748b;">Annuler</button>
-                <button onclick="saveTransport()" class="btn-main" style="background:var(--vol-color);">Enregistrer transport</button>
+            <div class="modal-actions">
+                <button onclick="closeModal('transportModal')" class="btn-main btn-secondary">Annuler</button>
+                <button onclick="saveTransport()" class="btn-main btn-vol">Enregistrer</button>
             </div>
         </div>
     </div>
 
-    <!-- Scripts CDN -->
+    <!-- MODAL : AJOUT RAPIDE (ACTIVITÉ / RESTO / CLIC CARTE) -->
+    <div id="quickAddModal" class="modal-bg" style="display:none;">
+        <div class="modal-box">
+            <h3 id="quickAddTitle">Ajouter un lieu</h3>
+            <input type="hidden" id="quickAddType">
+            <input type="hidden" id="quickAddLat">
+            <input type="hidden" id="quickAddLon">
+            
+            <label>Nom du lieu / Élément</label>
+            <input type="text" id="quickAddName" placeholder="Ex: Visite du Musée / Restaurant du Port">
+            
+            <div class="grid-2">
+                <div>
+                    <label>Prix</label>
+                    <input type="number" id="quickAddPrice" placeholder="0">
+                </div>
+                <div>
+                    <label>Heure</label>
+                    <input type="time" id="quickAddTime" value="12:00">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button onclick="closeModal('quickAddModal')" class="btn-main btn-secondary">Annuler</button>
+                <button onclick="saveQuickAdd()" class="btn-main btn-primary">Ajouter au Jour <span id="targetDayLabel"></span></button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
