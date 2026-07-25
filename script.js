@@ -3,27 +3,25 @@ let currentLang = localStorage.getItem('lang') || 'fr';
 let tripData = JSON.parse(localStorage.getItem('travelPlannerData')) || {};
 let map;
 let markers = {};
+let itemMarkers = [];
+let draggedItemIndex = null;
 
 // 1. INITIALISATION ET CARTE
 function initMap(center = [46, 2], zoom = 3) {
     if(map) map.remove();
     map = L.map('map').setView(center, zoom);
     
-    // On choisit le style de carte selon le mode sombre
     const isDark = localStorage.getItem('darkMode') === 'true';
     const tileUrl = isDark 
         ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
         : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
-    L.tileLayer(tileUrl, {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-    }).addTo(map);
-
+    L.tileLayer(tileUrl, { attribution: '&copy; CARTO' }).addTo(map);
     if(isDark) document.body.classList.add('dark-mode');
 }
 
 window.onload = () => {
-    ['dateStart', 'dateEnd', 'cityStart', 'cityEnd', 'currency', 'budgetMax', 'pax'].forEach(f => { 
+    ['dateStart', 'dateEnd', 'cityStart', 'cityEnd', 'currency', 'budgetMax', 'pax', 'polarstepsUrl'].forEach(f => { 
         if(localStorage.getItem(f)) document.getElementById(f).value = localStorage.getItem(f); 
     });
     
@@ -39,11 +37,9 @@ function toggleDarkMode() {
     const isDark = body.classList.toggle('dark-mode');
     localStorage.setItem('darkMode', isDark);
     
-    // On change le bouton (optionnel si tu as mis un ID 'dark-btn')
     const btn = document.getElementById('dark-btn');
     if(btn) btn.innerText = isDark ? "☀️" : "🌙";
 
-    // On recharge la couche de la carte pour qu'elle passe en sombre/clair
     const tileUrl = isDark 
         ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
         : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
@@ -51,14 +47,15 @@ function toggleDarkMode() {
     L.tileLayer(tileUrl, { attribution: '&copy; CARTO' }).addTo(map);
 }
 
-// 3. SAUVEGARDE ET CALCULS
+// 3. SAUVEGARDE ET CALCULS AVEC REMBOURSEMENTS SPLITWISE
 function save() {
     localStorage.setItem('travelPlannerData', JSON.stringify(tripData));
-    ['dateStart', 'dateEnd', 'cityStart', 'cityEnd', 'currency', 'budgetMax', 'pax'].forEach(f => {
+    ['dateStart', 'dateEnd', 'cityStart', 'cityEnd', 'currency', 'budgetMax', 'pax', 'polarstepsUrl'].forEach(f => {
         let el = document.getElementById(f); if(el) localStorage.setItem(f, el.value);
     });
     localStorage.setItem('lang', currentLang);
     updateTotal();
+    updateMapMarkers();
 }
 
 function saveAndRefresh() { save(); updateTotal(); }
@@ -66,13 +63,19 @@ function saveAndRefresh() { save(); updateTotal(); }
 function updateTotal() { 
     let total = 0; 
     let stats = { vol: 0, hotel: 0, activ: 0, resto: 0 };
+    let paidByPerson = {};
+
     const cur = document.getElementById('currency').value;
+    const pax = parseInt(document.getElementById('pax').value) || 1;
 
     Object.values(tripData).forEach(dayBlocks => {
         dayBlocks.forEach(b => {
             let p = parseFloat(b.price) || 0;
             total += p;
             if(stats[b.type] !== undefined) stats[b.type] += p;
+
+            let payer = (b.paidBy || 'Moi').trim();
+            paidByPerson[payer] = (paidByPerson[payer] || 0) + p;
         });
     });
 
@@ -80,30 +83,63 @@ function updateTotal() {
     const budgetMax = parseFloat(document.getElementById('budgetMax').value) || 0; 
     const alertEl = document.getElementById('alertLimit'); 
     
+    const perPerson = total / pax;
     totalEl.innerText = total.toFixed(2) + cur; 
     
     if (budgetMax > 0 && total > budgetMax) { 
-        totalEl.style.color = "#f87171"; 
+        totalEl.style.color = "#fca5a5"; 
         if(alertEl) alertEl.style.display = "block"; 
     } else { 
         totalEl.style.color = "white"; 
         if(alertEl) alertEl.style.display = "none"; 
     } 
 
+    // Récapitulatif
     const recapList = document.getElementById('recap-list');
-    const labels = currentLang === 'fr' 
-        ? { vol: 'Vols', hotel: 'Hébergements', activ: 'Activités', resto: 'Restaurants' } 
-        : { vol: 'Flights', hotel: 'Stays', activ: 'Activities', resto: 'Dining' };
-
     recapList.innerHTML = `
-        <div class="recap-item"><small><span class="recap-dot" style="background:#6366f1"></span>${labels.vol}</small> <span>${stats.vol}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#f59e0b"></span>${labels.hotel}</small> <span>${stats.hotel}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#ec4899"></span>${labels.activ}</small> <span>${stats.activ}${cur}</span></div>
-        <div class="recap-item"><small><span class="recap-dot" style="background:#10b981"></span>${labels.resto}</small> <span>${stats.resto}${cur}</span></div>
+        <div class="recap-item"><strong>Part par personne (${pax} pers.) :</strong> <span><strong>${perPerson.toFixed(2)}${cur}</strong></span></div>
+        <hr style="border:0; border-top:1px solid var(--border-color); margin:5px 0;">
+        <div class="recap-item"><small><span class="recap-dot" style="background:#6366f1"></span>Vols / Transports</small> <span>${stats.vol.toFixed(2)}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:#f59e0b"></span>Hébergements</small> <span>${stats.hotel.toFixed(2)}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:#ec4899"></span>Activités</small> <span>${stats.activ.toFixed(2)}${cur}</span></div>
+        <div class="recap-item"><small><span class="recap-dot" style="background:#10b981"></span>Restaurants</small> <span>${stats.resto.toFixed(2)}${cur}</span></div>
     `;
+
+    // Équilibre des comptes (Qui a payé quoi)
+    const splitDiv = document.getElementById('split-summary');
+    splitDiv.innerHTML = "";
+
+    if (Object.keys(paidByPerson).length === 0) {
+        splitDiv.innerHTML = `<small style="color:var(--text-muted);">Aucune dépense enregistrée.</small>`;
+    } else {
+        Object.entries(paidByPerson).forEach(([person, amount]) => {
+            let diff = amount - perPerson;
+            let statusColor = diff >= 0 ? "#10b981" : "#ef4444";
+            let statusText = diff >= 0 
+                ? `+${diff.toFixed(2)}${cur}` 
+                : `${diff.toFixed(2)}${cur}`;
+
+            splitDiv.innerHTML += `
+                <div style="display:flex; justify-content:space-between;">
+                    <span><strong>${person}</strong> (${amount.toFixed(2)}${cur})</span>
+                    <span style="color:${statusColor}; font-weight:bold;">${statusText}</span>
+                </div>
+            `;
+        });
+    }
+
+    // Lien Polarsteps
+    const polarUrl = document.getElementById('polarstepsUrl').value;
+    const polarBtn = document.getElementById('btnPolarsteps');
+    if (polarUrl) {
+        polarBtn.href = polarUrl;
+        polarBtn.style.display = "inline-block";
+    } else {
+        polarBtn.style.display = "none";
+    }
 }
 
-// 4. TIMELINE ET BLOCS
+// 4. TIMELINE ET BLOCS AVEC DRAG & DROP
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -126,8 +162,21 @@ function generateTimeline() {
     updateDayTitle(); renderBlocks(); save();
 }
 
-function addBlock(type) { 
-    tripData[activeDay].push({ id: Date.now(), type, name: '', price: 0, time: '00:00', address: '', bookingUrl: '', notes: '' }); 
+function updateDayTitle() { document.getElementById('currentDayTitle').innerText = (currentLang === 'fr' ? 'Jour ' : 'Day ') + activeDay; }
+
+function addBlock(type, name = '', lat = null, lon = null) { 
+    tripData[activeDay].push({ 
+        id: Date.now(), 
+        type, 
+        name: name || '', 
+        price: 0, 
+        time: '10:00', 
+        notes: '',
+        paidBy: 'Moi',
+        bookingUrl: '',
+        lat,
+        lon
+    }); 
     renderBlocks(); 
     save(); 
 }
@@ -136,21 +185,67 @@ function renderBlocks() {
     const list = document.getElementById('blocksList'); 
     list.innerHTML = ""; 
     const cur = document.getElementById('currency').value; 
-    (tripData[activeDay] || []).sort((a,b) => a.time.localeCompare(b.time)).forEach(b => { 
+
+    (tripData[activeDay] || []).forEach((b, index) => { 
         let div = document.createElement('div'); 
         div.className = `trip-block block-${b.type}`; 
-        let icon = b.type==='vol'?'✈️':b.type==='hotel'?'🏨':b.type==='resto'?'🍴':'🎟️';
+        div.setAttribute('draggable', 'true');
+        div.dataset.index = index;
+
+        let icon = b.type === 'vol' ? '✈️' : b.type === 'hotel' ? '🏨' : b.type === 'resto' ? '🍴' : '🎟️';
         
-        let extra = b.type === 'hotel' ? `<div style="margin-top:10px; display:grid; gap:5px;"><input type="text" placeholder="Lien Booking" value="${b.bookingUrl || ''}" onchange="updateB(${b.id}, 'bookingUrl', this.value)"><input type="text" placeholder="Adresse" value="${b.address || ''}" onchange="updateB(${b.id}, 'address', this.value)"></div>` : ''; 
+        let extra = `<div style="margin-top:8px; display:grid; gap:5px;">
+            <div style="display:flex; gap:10px;">
+                <input type="text" placeholder="${currentLang === 'fr' ? 'Notes / Adresse' : 'Notes / Address'}" value="${b.notes || ''}" style="flex:1;" onchange="updateB(${b.id}, 'notes', this.value)">
+                <input type="text" placeholder="Payé par" value="${b.paidBy || 'Moi'}" style="width:90px;" onchange="updateB(${b.id}, 'paidBy', this.value)">
+            </div>
+            ${b.type === 'hotel' ? `<input type="text" placeholder="Lien de réservation" value="${b.bookingUrl || ''}" onchange="updateB(${b.id}, 'bookingUrl', this.value)">` : ''}
+        </div>`; 
 
         div.innerHTML = `
-            <div style="display:flex; align-items:center; gap:10px;">
-                <input type="time" style="width:80px" value="${b.time}" onchange="updateB(${b.id}, 'time', this.value)">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="cursor:grab; font-size:1.1rem; color:var(--text-muted);" title="Glisser pour réordonner">☰</span>
+                <input type="time" style="width:75px" value="${b.time}" onchange="updateB(${b.id}, 'time', this.value)">
                 <div style="font-size:1.2rem">${icon}</div>
-                <input type="text" style="flex:1; font-weight:bold;" value="${b.name}" onchange="updateB(${b.id}, 'name', this.value)">
-                <input type="number" style="width:70px" value="${b.price}" oninput="updateB(${b.id}, 'price', this.value)">${cur}
-                <button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer;">✕</button>
+                <input type="text" style="flex:1; font-weight:bold;" value="${b.name}" placeholder="Nom" onchange="updateB(${b.id}, 'name', this.value)">
+                <input type="number" style="width:65px" value="${b.price}" oninput="updateB(${b.id}, 'price', this.value)">${cur}
+                <button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer; color:var(--text-muted);">✕</button>
             </div>${extra}`; 
+
+        // Drag & Drop
+        div.addEventListener('dragstart', (e) => {
+            draggedItemIndex = index;
+            div.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        div.addEventListener('dragend', () => {
+            div.classList.remove('dragging');
+            document.querySelectorAll('.trip-block').forEach(el => el.classList.remove('drag-over'));
+        });
+
+        div.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            div.classList.add('drag-over');
+        });
+
+        div.addEventListener('dragleave', () => {
+            div.classList.remove('drag-over');
+        });
+
+        div.addEventListener('drop', (e) => {
+            e.preventDefault();
+            div.classList.remove('drag-over');
+            const targetIndex = parseInt(div.dataset.index, 10);
+            if (draggedItemIndex !== null && draggedItemIndex !== targetIndex) {
+                const movedItem = tripData[activeDay].splice(draggedItemIndex, 1)[0];
+                tripData[activeDay].splice(targetIndex, 0, movedItem);
+                save();
+                renderBlocks();
+            }
+        });
+
         list.appendChild(div); 
     }); 
     updateTotal(); 
@@ -160,14 +255,13 @@ async function updateB(id, f, v) {
     let block = tripData[activeDay].find(x => x.id === id); 
     if(!block) return; 
     block[f] = f === 'price' ? parseFloat(v) : v; 
-    if(f === 'time') renderBlocks(); 
     save(); 
 }
 
-// 5. RECHERCHE RESTAURANTS
-async function findRestaurants(filter = 'all') {
+// 5. RECHERCHE DE LIEUX ET RESTAURANTS
+async function findPlaces(category = 'resto', filter = 'all') {
     if (!markers['end']) {
-        alert(currentLang === 'fr' ? "Choisissez d'abord une destination." : "Please select a destination first.");
+        alert(currentLang === 'fr' ? "Choisissez d'abord une destination dans la barre de recherche." : "Please select a destination first.");
         return;
     }
     const resultsDiv = document.getElementById('resto-results');
@@ -178,10 +272,11 @@ async function findRestaurants(filter = 'all') {
     listDiv.innerHTML = `<div style="display:flex; align-items:center; padding:20px;"><div class="spinner"></div> ${currentLang === 'fr' ? 'Recherche...' : 'Searching...'}</div>`;
     resultsDiv.style.display = 'block';
 
-    let amenityType = 'restaurant|cafe';
-    let cuisineFilter = filter !== 'all' ? `["cuisine"~"${filter}"]` : '';
+    let overpassFilter = category === 'resto' 
+        ? `node["amenity"~"restaurant|cafe"]${filter !== 'all' ? `["cuisine"~"${filter}"]` : ''}(around:3000,${lat},${lng});`
+        : `node["tourism"~"attraction|museum|viewpoint|gallery"](around:3000,${lat},${lng});`;
 
-    const query = `[out:json];node["amenity"~"${amenityType}"]${cuisineFilter}(around:2000,${lat},${lng});out;`;
+    const query = `[out:json];${overpassFilter}out 10;`;
     const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
     try {
@@ -190,43 +285,53 @@ async function findRestaurants(filter = 'all') {
         listDiv.innerHTML = "";
 
         if (data.elements.length === 0) {
-            listDiv.innerHTML = `<p style="padding:10px; font-size:0.8rem;">Aucun résultat.</p>`;
+            listDiv.innerHTML = `<p style="padding:10px; font-size:0.8rem;">Aucun résultat trouvé.</p>`;
             return;
         }
 
-        data.elements.slice(0, 8).forEach(item => {
-            const name = item.tags.name || "Restaurant";
-            const cuisine = item.tags.cuisine || "";
+        data.elements.forEach(item => {
+            const name = item.tags.name || (category === 'resto' ? "Restaurant" : "Attraction");
+            const sub = item.tags.cuisine || item.tags.tourism || "";
             const btn = document.createElement('button');
             btn.className = "btn-api";
-            btn.style = "text-align:left; background:var(--card-bg); width:100%; margin-bottom:5px; justify-content:space-between;";
-            btn.innerHTML = `<span><strong>${name}</strong><br><small>${cuisine}</small></span><span>+</span>`;
+            btn.style = "text-align:left; background:var(--card-bg); width:100%; margin-bottom:5px; justify-content:space-between; color:var(--text-main); border:1px solid var(--border-color);";
+            btn.innerHTML = `<span><strong>${name}</strong><br><small style="color:var(--text-muted);">${sub}</small></span><span style="color:var(--accent); font-weight:bold;">+</span>`;
             btn.onclick = () => {
-                addRestoToTrip(name, cuisine);
+                addBlock(category === 'resto' ? 'resto' : 'activ', name, item.lat, item.lon);
                 btn.innerHTML = "✅";
                 btn.disabled = true;
             };
             listDiv.appendChild(btn);
         });
-    } catch (e) { listDiv.innerHTML = "Erreur réseau."; }
+    } catch (e) { listDiv.innerHTML = "Erreur de chargement."; }
 }
 
-function addRestoToTrip(name, cuisine) {
-    tripData[activeDay].push({
-        id: Date.now(),
-        type: 'resto',
-        name: `🍴 ${name}`,
-        price: 0,
-        time: '12:30',
-        address: '',
-        bookingUrl: '',
-        notes: cuisine || ''
+function findRestaurants(filter = 'all') { findPlaces('resto', filter); }
+function findActivities() { findPlaces('activ', 'all'); }
+
+// 6. CARTE ET MARQUEURS INTERACTIFS AVEC LIEN GOOGLE MAPS
+function updateMapMarkers() {
+    itemMarkers.forEach(m => map.removeLayer(m));
+    itemMarkers = [];
+
+    (tripData[activeDay] || []).forEach(b => {
+        if (b.lat && b.lon) {
+            const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lon}`;
+            const popupContent = `
+                <div style="font-family:sans-serif; text-align:center;">
+                    <strong style="font-size:1rem;">${b.name}</strong><br>
+                    <small>${b.notes || ''}</small><br><br>
+                    <a href="${googleMapsUrl}" target="_blank" style="background:#3b82f6; color:white; padding:5px 10px; border-radius:6px; text-decoration:none; font-size:0.8rem;">
+                        🗺️ Ouvrir dans Google Maps
+                    </a>
+                </div>
+            `;
+            let m = L.marker([b.lat, b.lon]).addTo(map).bindPopup(popupContent);
+            itemMarkers.push(m);
+        }
     });
-    renderBlocks();
-    save();
 }
 
-// 6. RECHERCHE VILLES ET UTILES
 async function handleSearch(q, type) { 
     const sugg = document.getElementById(type === 'start' ? 'suggestionsStart' : 'suggestionsEnd'); 
     if(q.length < 3) { sugg.style.display = 'none'; return; }
@@ -265,42 +370,26 @@ async function restoreMapMarkers() {
 
 function delB(id) { tripData[activeDay] = tripData[activeDay].filter(x => x.id !== id); renderBlocks(); save(); }
 
+// 7. FONCTIONS ANNEXES
+function toggleLang() {
+    currentLang = currentLang === 'fr' ? 'en' : 'fr';
+    applyLang(); generateTimeline(); save();
+}
+
+function initDates() { 
+    const start = document.getElementById('dateStart').value; 
+    if(start) { 
+        let next = new Date(start); 
+        next.setDate(next.getDate() + 1); 
+        document.getElementById('dateEnd').value = next.toISOString().split('T')[0]; 
+        generateTimeline(); 
+    } 
+}
+
 function applyLang() { 
     const texts = { 
-        fr: { title: "Explorez le monde ✈️", 
-             subtitle: "Préparez votre itinéraire sur-mesure", 
-             start: "DÉPART", 
-             end: "ARRIVÉE", 
-             from: "DU", 
-             to: "AU", 
-             cur: "DEVISE", 
-             total: "TOTAL", 
-             budget: "Budget :", 
-             pdf: "📄 PDF", 
-             vol: "Vol", 
-             hotel: "Hôtel", 
-             activ: "Activité", 
-             resto: "Restaurant",
-             focusShow: "Afficher l'en-tête",
-             focusHide: "Masquer l'en-tête",
-             pax: "VOYAGEURS" }, 
-        en: { title: "Explore the World ✈️", 
-             subtitle: "Plan your custom itinerary", 
-             start: "FROM", 
-             end: "TO", 
-             from: "START", 
-             to: "END", 
-             cur: "CURRENCY", 
-             total: "TOTAL", 
-             budget: "Budget:", 
-             pdf: "📄 PDF", 
-             vol: "Flight", 
-             hotel: "Hotel", 
-             activ: "Activity", 
-             resto: "Dining", 
-             focusShow: "Show Header",
-             focusHide: "Hide Header",
-             pax: "TRAVELERS" } 
+        fr: { title: "Explorez le monde ✈️", subtitle: "Préparez votre itinéraire sur-mesure", start: "DÉPART", end: "ARRIVÉE", from: "DU", to: "AU", cur: "DEVISE", total: "TOTAL DU VOYAGE", budget: "Budget estimé :", pdf: "📄 Télécharger en PDF", vol: "Vol / Transport", hotel: "Hôtel", activ: "Activité", resto: "Restaurant", pax: "VOYAGEURS" }, 
+        en: { title: "Explore the World ✈️", subtitle: "Plan your custom itinerary", start: "FROM", end: "TO", from: "START", to: "END", cur: "CURRENCY", total: "TRIP TOTAL", budget: "Estimated budget:", pdf: "📄 Download PDF", vol: "Flight / Transit", hotel: "Hotel", activ: "Activity", resto: "Restaurant", pax: "TRAVELERS" } 
     }; 
     const t = texts[currentLang]; 
     document.getElementById('txt-title').innerText = t.title; 
@@ -324,22 +413,19 @@ function applyLang() {
 function toggleFocus() {
     const isHidden = document.body.classList.toggle('header-hidden');
     const icon = document.getElementById('focus-icon');
-    const text = document.getElementById('focus-text'); // On récupère l'élément texte
-    
+    const text = document.getElementById('focus-text');
     icon.innerText = isHidden ? "🔽" : "🔼";
-    
-    // On met à jour le texte selon la langue et l'état
-    if (text) {
-        if (currentLang === 'fr') {
-            text.innerText = isHidden ? "Afficher l'en-tête" : "Masquer l'en-tête";
-        } else {
-            text.innerText = isHidden ? "Show Header" : "Hide Header";
-        }
-    }
-    
+    if (text) text.innerText = isHidden ? (currentLang === 'fr' ? "Afficher l'en-tête" : "Show Header") : (currentLang === 'fr' ? "Masquer l'en-tête" : "Hide Header");
     setTimeout(() => { map.invalidateSize(); }, 300);
 }
 
 function clearAll() { if(confirm("Tout effacer ?")) { localStorage.clear(); location.reload(); } }
-function exportPDF() { html2pdf().from(document.body).save('Itineraire.pdf'); }
 
+function downloadData() {
+    const data = { tripData, settings: { cityStart: document.getElementById('cityStart').value, cityEnd: document.getElementById('cityEnd').value, dateStart: document.getElementById('dateStart').value, dateEnd: document.getElementById('dateEnd').value, budgetMax: document.getElementById('budgetMax').value, currency: document.getElementById('currency').value, pax: document.getElementById('pax').value, polarstepsUrl: document.getElementById('polarstepsUrl').value } };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `Voyage.json`; a.click();
+}
+
+function exportPDF() { html2pdf().from(document.body).save('Itineraire.pdf'); }
