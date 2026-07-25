@@ -77,7 +77,69 @@ body {
     border: 1px solid var(--border-color);
 }
 
-/* 3. COLONNES & LAYOUT */
+/* 3. BARRE DE RECHERCHE INTERNE (WANDERLOG STYLE) */
+.wander-search-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.wander-search-box input {
+    flex: 1;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    box-shadow: var(--btn-shadow);
+}
+
+.quick-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    overflow-x: auto;
+    padding-bottom: 5px;
+}
+
+.chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-main);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.chip:hover { transform: translateY(-1px); }
+.chip-vol { border-color: var(--vol-color); color: var(--vol-color); }
+.chip-hotel { border-color: var(--hotel-color); color: var(--hotel-color); }
+.chip-activ { border-color: var(--activ-color); color: var(--activ-color); }
+.chip-resto { border-color: var(--resto-color); color: var(--resto-color); }
+
+.results-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: var(--btn-shadow);
+}
+
+.place-card-result {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-radius: 10px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-color);
+}
+
+/* 4. COLONNES & LAYOUT */
 .main-container { 
     display: grid; 
     grid-template-columns: 260px 1fr 350px; 
@@ -110,13 +172,8 @@ body {
 .day-num { font-weight: 800; color: var(--accent); display: block; font-size: 1rem; }
 .day-date { color: var(--text-muted); font-size: 0.8rem; }
 
-/* 4. BOUTONS & GROUPES */
-.btn-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-}
+/* 5. BOUTONS & BLOCS */
+.btn-group { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 
 .btn-main, .btn-api { 
     border: none; 
@@ -138,12 +195,6 @@ body {
 
 .btn-main:hover { transform: translateY(-2px); filter: brightness(1.05); }
 
-.btn-vol { background: var(--vol-color); }
-.btn-hotel { background: var(--hotel-color); }
-.btn-activ { background: var(--activ-color); }
-.btn-resto { background: var(--resto-color); }
-
-/* 5. BLOCS D'ITINÉRAIRE ET DRAG & DROP */
 .trip-block { 
     background: var(--card-bg); 
     border-radius: 16px; 
@@ -154,11 +205,11 @@ body {
     border-top: 1px solid var(--border-color);
     cursor: grab;
     user-select: none;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease;
 }
 
 .trip-block:active { cursor: grabbing; }
-.trip-block.dragging { opacity: 0.4; transform: scale(0.98); border: 2px dashed var(--accent); }
+.trip-block.dragging { opacity: 0.4; transform: scale(0.98); }
 .trip-block.drag-over { border-top: 3px solid var(--accent); }
 
 .block-vol { border-color: var(--vol-color); }
@@ -175,7 +226,7 @@ input, select {
     font-size: 0.85rem; 
 }
 
-/* 6. SIDEBAR & CARTES */
+/* 6. SIDEBAR & CARTE */
 .sidebar { gap: 15px; overflow-y: auto; }
 
 .budget-card { 
@@ -199,9 +250,9 @@ input, select {
 /* 7. SPINNER & AUTRES */
 .spinner {
     width: 18px; height: 18px;
-    border: 3px solid rgba(16, 185, 129, 0.2);
+    border: 3px solid rgba(255, 126, 95, 0.2);
     border-radius: 50%;
-    border-top-color: var(--resto-color);
+    border-top-color: var(--accent);
     animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
