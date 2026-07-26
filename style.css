@@ -90,18 +90,18 @@ body { font-family: 'Poppins', sans-serif; background: var(--bg-app); color: var
 .day-item { padding: 8px; border-radius: 8px; margin-bottom: 5px; cursor: pointer; background: var(--bg-app); transition: 0.2s; font-size: 0.85rem; }
 .day-item.active { background: rgba(255, 126, 95, 0.15); border: 1px solid var(--accent); }
 
-/* BLOCS DÉVÉNEMENTS DU JOUR */
+/* BLOCS D'ÉVÉNEMENTS DU JOUR */
 .trip-block { background: var(--card-bg); border-radius: 10px; padding: 10px; margin-bottom: 8px; border-left: 4px solid var(--accent); box-shadow: var(--btn-shadow); border-top: 1px solid var(--border-color); }
 .block-hotel { border-left-color: var(--hotel-color); }
 .block-vol { border-left-color: var(--vol-color); }
 .block-activ { border-left-color: var(--activ-color); }
 .block-resto { border-left-color: var(--resto-color); }
 
-/* CARTE ENCORE PLUS GRANDE */
+/* CARTE */
 #map { height: 480px; min-height: 400px; width: 100%; border-radius: 16px; border: 2px solid var(--card-bg); flex-shrink: 0; margin-bottom: 6px; cursor: crosshair; }
 .map-hint { text-align: center; color: var(--text-muted); font-size: 0.75rem; margin-bottom: 10px; display: block; font-weight: 600; }
 
-/* DEUXIÈME BLOC BUDGET */
+/* BLOC BUDGET */
 .budget-card { background: var(--gradient); color: white; padding: 12px 20px; border-radius: 14px; text-align: center; margin-bottom: 12px; }
 .budget-row { display: flex; justify-content: space-around; align-items: center; }
 .budget-row h1, .budget-row h2 { margin: 0; }
