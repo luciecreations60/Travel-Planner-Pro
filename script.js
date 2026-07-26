@@ -1,5 +1,6 @@
 let activeDay = 1;
 let tripData = JSON.parse(localStorage.getItem('travelPlannerData')) || {};
+let hotelBookings = JSON.parse(localStorage.getItem('hotelBookings')) || [];
 let map;
 let itemMarkers = [];
 let searchMarker = null;
@@ -169,7 +170,7 @@ function selectQuickAddAddress(name, lat, lon, containerId) {
     document.getElementById(containerId).style.display = 'none';
 }
 
-// 3. REDIRECTION AUTOMATIQUE EN FONCTION DE LA CATÉGORIE SÉLECTIONNÉE
+// 3. BASCOLATION DYNAMIQUE VERS LA BONNE MODALE
 function handleCategoryChange(selectedCategory) {
     const currentName = document.getElementById('quickAddName').value;
     const currentLat = document.getElementById('quickAddLat').value;
@@ -228,13 +229,12 @@ function populateDaySelector() {
     }
 }
 
-// 5. MODALE HÔTEL MULTI-JOURS (PRÉ-REMPLISSAGE)
+// 5. MODALE HÔTEL MULTI-JOURS (PRÉ-REMPLISSAGE ET GESTION DU TOTAL GLOBAL)
 function openHotelModal(defaultName = '', lat = null, lon = null) {
     document.getElementById('hotelName').value = defaultName;
     document.getElementById('hotelLat').value = lat || '';
     document.getElementById('hotelLon').value = lon || '';
 
-    // Pré-remplissage des dates
     const startDateInput = document.getElementById('dateStart').value;
     if (startDateInput) {
         let d = new Date(startDateInput);
@@ -264,9 +264,21 @@ function saveHotel() {
     const endDate = new Date(end);
     const tripStart = new Date(document.getElementById('dateStart').value || Date.now());
 
+    const bookingId = Date.now();
     const totalNights = Math.max(1, Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)));
     const pricePerNight = price / totalNights;
 
+    // Enregistre l'hébergement au niveau global pour la synthèse avec son tarif TOTAL
+    hotelBookings.push({
+        id: bookingId,
+        name,
+        totalPrice: price,
+        start, end,
+        startDay: Math.max(1, Math.round((startDate - tripStart) / (1000 * 60 * 60 * 24)) + 1),
+        lat, lon
+    });
+
+    // Génère les sous-blocs nuit par nuit dans l'agenda du jour
     let curr = new Date(startDate);
     while (curr < endDate) {
         let dayNum = Math.round((curr - tripStart) / (1000 * 60 * 60 * 24)) + 1;
@@ -274,6 +286,7 @@ function saveHotel() {
             if (!tripData[dayNum]) tripData[dayNum] = [];
             tripData[dayNum].push({
                 id: Date.now() + Math.random(),
+                bookingId: bookingId,
                 type: 'hotel',
                 name: `🏨 ${name}`,
                 price: pricePerNight,
@@ -360,7 +373,13 @@ function saveQuickAdd() {
     const lat = parseFloat(document.getElementById('quickAddLat').value) || null;
     const lon = parseFloat(document.getElementById('quickAddLon').value) || null;
 
-    const icons = { hotel: '🏨 ', vol: '🚆 ', activ: '🎟️ ', resto: '🍴 ' };
+    if (type === 'hotel') {
+        closeModal('quickAddModal');
+        openHotelModal(name, lat, lon);
+        return;
+    }
+
+    const icons = { vol: '🚆 ', activ: '🎟️ ', resto: '🍴 ' };
     if (!name.match(/^(🏨|🚆|🎟️|🍴)/)) {
         name = (icons[type] || '') + name;
     }
@@ -398,7 +417,7 @@ function renderBlocks() {
                 <strong style="font-size:0.85rem;">${b.name}</strong>
                 <div>
                     <span style="font-weight:bold; color:var(--accent);">${b.price.toFixed(2)}${cur}</span>
-                    <button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer; margin-left:6px;">✕</button>
+                    <button onclick="delB(${b.id}, ${b.bookingId || 'null'})" style="border:none; background:none; cursor:pointer; margin-left:6px;">✕</button>
                 </div>
             </div>
             <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
@@ -429,19 +448,43 @@ function updateTotal() {
     document.getElementById('perPaxLabel').innerText = perPax.toFixed(2) + cur;
 }
 
+// AFFICHAGE DU TARIF TOTAL DANS LA SYNTHÈSE DES HÉBERGEMENTS
 function renderCategoriesRecap() {
-    const categories = { hotel: [], vol: [], activ: [], resto: [] };
+    const categories = { vol: [], activ: [], resto: [] };
     const cur = document.getElementById('currency').value;
 
     Object.entries(tripData).forEach(([dayNum, items]) => {
         items.forEach(item => {
-            if (categories[item.type]) {
+            if (item.type !== 'hotel' && categories[item.type]) {
                 categories[item.type].push({ ...item, dayNum });
             }
         });
     });
 
-    ['hotel', 'vol', 'activ', 'resto'].forEach(cat => {
+    // 1. Catégorie Hébergements (Affiche le prix TOTAL complet)
+    const hotelContainer = document.getElementById('cat-list-hotel');
+    hotelContainer.innerHTML = "";
+    if (hotelBookings.length === 0) {
+        hotelContainer.innerHTML = `<small style="color:var(--text-muted); font-size:0.75rem; padding:4px;">Aucun hébergement</small>`;
+    } else {
+        hotelBookings.forEach(booking => {
+            let div = document.createElement('div');
+            div.className = 'cat-item';
+            div.onclick = () => {
+                activeDay = parseInt(booking.startDay) || 1;
+                generateTimeline();
+                if (booking.lat && booking.lon) map.setView([booking.lat, booking.lon], 14);
+            };
+            div.innerHTML = `
+                <span>🏨 ${booking.name} <small style="color:var(--text-muted);">(du ${booking.start} au ${booking.end})</small></span>
+                <strong>${booking.totalPrice.toFixed(0)}${cur}</strong>
+            `;
+            hotelContainer.appendChild(div);
+        });
+    }
+
+    // 2. Transports, Activités & Restaurants
+    ['vol', 'activ', 'resto'].forEach(cat => {
         const catContainer = document.getElementById(`cat-list-${cat}`);
         catContainer.innerHTML = "";
         
@@ -467,8 +510,16 @@ function renderCategoriesRecap() {
     });
 }
 
-function delB(id) {
-    tripData[activeDay] = tripData[activeDay].filter(x => x.id !== id);
+function delB(id, bookingId = null) {
+    if (bookingId) {
+        // Supprime l'hébergement global et l'ensemble de ses nuitées du voyage
+        hotelBookings = hotelBookings.filter(b => b.id !== bookingId);
+        Object.keys(tripData).forEach(d => {
+            tripData[d] = tripData[d].filter(x => x.bookingId !== bookingId);
+        });
+    } else {
+        tripData[activeDay] = tripData[activeDay].filter(x => x.id !== id);
+    }
     renderBlocks();
     save();
 }
@@ -487,6 +538,7 @@ function updateMapMarkers() {
 
 function save() {
     localStorage.setItem('travelPlannerData', JSON.stringify(tripData));
+    localStorage.setItem('hotelBookings', JSON.stringify(hotelBookings));
     ['dateStart', 'dateEnd', 'cityStart', 'cityEnd', 'currency', 'pax'].forEach(f => {
         let el = document.getElementById(f); if(el) localStorage.setItem(f, el.value);
     });
@@ -495,6 +547,6 @@ function save() {
 function saveAndRefresh() { save(); renderBlocks(); }
 function clearAll() { if(confirm("Supprimer l'intégralité du planning ?")) { localStorage.clear(); location.reload(); } }
 function downloadData() {
-    const blob = new Blob([JSON.stringify(tripData, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ tripData, hotelBookings }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Voyage.json`; a.click();
 }
