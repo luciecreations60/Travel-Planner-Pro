@@ -51,13 +51,13 @@
         </div>
     </div>
 
-    <!-- MAIN CONTAINER (LAYOUT 50% / 50%) -->
+    <!-- MAIN CONTAINER -->
     <div class="main-container">
         
-        <!-- SECTION GAUCHE : PLANNING & RECHERCHE (50%) -->
+        <!-- SECTION GAUCHE -->
         <div class="left-section">
             
-            <!-- SOUS-COLONNE 1 : TIMELINE -->
+            <!-- TIMELINE -->
             <div class="column-timeline scrollable">
                 <h3>🗓️ Itinéraire</h3>
                 <div id="timelineArea"></div>
@@ -68,14 +68,17 @@
                 </div>
             </div>
 
-            <!-- SOUS-COLONNE 2 : CONTENU DU JOUR SÉLECTIONNÉ -->
+            <!-- CONTENU DU JOUR -->
             <div class="column-day-content scrollable">
                 <h2 id="currentDayTitle">Jour 1</h2>
                 
-                <!-- RECHERCHE GLOBALE AU FIL DE LA SAISIE + CROIX -->
-                <div class="search-input-wrapper">
-                    <input type="text" id="wanderQuery" placeholder="🔎 Ville, hôtel, lieu..." oninput="handleLiveSearch(this.value)">
-                    <button type="button" class="clear-btn" id="clearWanderSearch" onclick="clearSearchInput('wanderQuery', 'search-results-panel')">✕</button>
+                <!-- RECHERCHE GLOBALE AVEC TOUCHE ENTRÉE & BOUTON RECHERCHER -->
+                <div class="search-box-container">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="wanderQuery" placeholder="🔎 Ville, hôtel, lieu..." onkeydown="handleSearchKeyDown(event)" oninput="handleLiveSearch(this.value)">
+                        <button type="button" class="clear-btn" onclick="clearSearchInput('wanderQuery', 'search-results-panel')">✕</button>
+                    </div>
+                    <button class="btn-main btn-primary search-btn" onclick="triggerManualSearch()">Rechercher</button>
                 </div>
 
                 <!-- BOUTONS FILTRES -->
@@ -95,7 +98,7 @@
                     <div class="transport-opt" onclick="openTransportModal('Voiture', '🚗')">🚗 Voiture</div>
                 </div>
 
-                <!-- RÉSULTATS DE RECHERCHE EN DIRECT -->
+                <!-- RÉSULTATS DE RECHERCHE -->
                 <div id="search-results-panel" class="results-panel" style="display:none;">
                     <div class="results-header">
                         <h4>Résultats trouvés</h4>
@@ -110,10 +113,10 @@
 
         </div>
 
-        <!-- SECTION DROITE : CARTE & SYNTHÈSE -->
+        <!-- SECTION DROITE -->
         <div class="right-section scrollable">
             <div id="map"></div>
-            <small class="map-hint">📍 Cliquez sur la carte pour capturer précisément un lieu et l'ajouter</small>
+            <small class="map-hint">📍 Cliquez sur la carte pour ajouter un lieu | Les pointeurs offrent des liens GPS (Google, Apple, Waze)</small>
 
             <!-- CARTE DU BUDGET -->
             <div class="budget-card">
@@ -171,14 +174,14 @@
 
     </div>
 
-    <!-- MODAL : HÔTEL MULTI-JOURS (DÉDIÉE) -->
+    <!-- MODAL : HÔTEL MULTI-JOURS -->
     <div id="hotelModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3>🏨 Ajouter un Hébergement</h3>
             
-            <label>Recherche de l'établissement</label>
+            <label>Libellé personnalisé / Nom</label>
             <div class="search-input-wrapper">
-                <input type="text" id="hotelName" placeholder="Ex: Camping L'esplanade..." oninput="handleModalLiveSearch(this.value, 'hotelModalResults', selectHotelAddress)">
+                <input type="text" id="hotelName" placeholder="Ex: Hôtel Mercure Centre..." oninput="handleModalLiveSearch(this.value, 'hotelModalResults', selectHotelAddress)">
                 <button type="button" class="clear-btn" onclick="clearSearchInput('hotelName', 'hotelModalResults')">✕</button>
             </div>
             <div id="hotelModalResults" class="modal-live-results"></div>
@@ -213,24 +216,18 @@
         </div>
     </div>
 
-    <!-- MODAL : TRANSPORT (DÉDIÉE) -->
+    <!-- MODAL : TRANSPORT -->
     <div id="transportModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3 id="transportModalTitle">🚆 Ajouter un Transport</h3>
             <div class="grid-2">
                 <div>
                     <label>Lieu de Départ</label>
-                    <div class="search-input-wrapper">
-                        <input type="text" id="transFrom" placeholder="Ex: Nice">
-                        <button type="button" class="clear-btn" onclick="clearSearchInput('transFrom')">✕</button>
-                    </div>
+                    <input type="text" id="transFrom" placeholder="Ex: Nice">
                 </div>
                 <div>
                     <label>Lieu d'Arrivée</label>
-                    <div class="search-input-wrapper">
-                        <input type="text" id="transTo" placeholder="Ex: Ajaccio">
-                        <button type="button" class="clear-btn" onclick="clearSearchInput('transTo')">✕</button>
-                    </div>
+                    <input type="text" id="transTo" placeholder="Ex: Ajaccio">
                 </div>
                 <div>
                     <label>Départ (Date/Heure)</label>
@@ -278,7 +275,6 @@
                 </div>
                 <div>
                     <label>Catégorie</label>
-                    <!-- SWITCH AUTOMATIQUE VERS LA BONNE MODALE -->
                     <select id="quickAddType" onchange="handleCategoryChange(this.value)">
                         <option value="activ">🎟️ Activité</option>
                         <option value="resto">🍴 Restaurant</option>
@@ -288,9 +284,9 @@
                 </div>
             </div>
 
-            <label>Nom du lieu / Élément</label>
+            <label>Libellé personnalisé / Nom</label>
             <div class="search-input-wrapper">
-                <input type="text" id="quickAddName" placeholder="Ex: Visite du Musée..." oninput="handleModalLiveSearch(this.value, 'quickAddModalResults', selectQuickAddAddress)">
+                <input type="text" id="quickAddName" placeholder="Saisissez ou recherchez un nom..." oninput="handleModalLiveSearch(this.value, 'quickAddModalResults', selectQuickAddAddress)">
                 <button type="button" class="clear-btn" onclick="clearSearchInput('quickAddName', 'quickAddModalResults')">✕</button>
             </div>
             <div id="quickAddModalResults" class="modal-live-results"></div>
@@ -308,6 +304,46 @@
             <div class="modal-actions">
                 <button onclick="closeModal('quickAddModal')" class="btn-main btn-secondary">Annuler</button>
                 <button onclick="saveQuickAdd()" class="btn-main btn-primary">Valider & Ajouter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL : EDITER UN ÉVÉNEMENT -->
+    <div id="editModal" class="modal-bg" style="display:none;">
+        <div class="modal-box">
+            <h3>✏️ Modifier l'événement</h3>
+            <input type="hidden" id="editId">
+            <input type="hidden" id="editDay">
+            <input type="hidden" id="editBookingId">
+
+            <label>Libellé / Nom</label>
+            <input type="text" id="editName">
+
+            <div class="grid-2">
+                <div>
+                    <label>Prix</label>
+                    <input type="number" id="editPrice">
+                </div>
+                <div>
+                    <label>Heure</label>
+                    <input type="time" id="editTime">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div>
+                    <label>Payé par</label>
+                    <input type="text" id="editPaidBy">
+                </div>
+                <div>
+                    <label>Notes / Détails</label>
+                    <input type="text" id="editNotes">
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button onclick="closeModal('editModal')" class="btn-main btn-secondary">Annuler</button>
+                <button onclick="saveEdit()" class="btn-main btn-primary">Enregistrer</button>
             </div>
         </div>
     </div>
