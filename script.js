@@ -44,7 +44,7 @@ window.onload = () => {
 
 function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
 
-// FONCTION POUR EFFACER LES CHAMPS D'INPUT (CROIX ✕)
+// EFFACER LES CHAMPS D'INPUT (CROIX ✕)
 function clearSearchInput(inputId, resultsPanelId = null) {
     document.getElementById(inputId).value = '';
     if (resultsPanelId) {
@@ -120,7 +120,7 @@ function addBlockFromSearch(name, lat, lon) {
 
 function closeResults() { document.getElementById('search-results-panel').style.display = 'none'; }
 
-// RECHERCHE DANS LES MODALES AU FIL DE LA SAISIE
+// RECHERCHE AUTOCOMPLÉTÉE DANS LES MODALES
 function handleModalLiveSearch(query, resultsContainerId, selectCallback) {
     clearTimeout(searchTimeout);
     const container = document.getElementById(resultsContainerId);
@@ -169,7 +169,22 @@ function selectQuickAddAddress(name, lat, lon, containerId) {
     document.getElementById(containerId).style.display = 'none';
 }
 
-// 3. TIMELINE & BLOCS
+// 3. REDIRECTION AUTOMATIQUE EN FONCTION DE LA CATÉGORIE SÉLECTIONNÉE
+function handleCategoryChange(selectedCategory) {
+    const currentName = document.getElementById('quickAddName').value;
+    const currentLat = document.getElementById('quickAddLat').value;
+    const currentLon = document.getElementById('quickAddLon').value;
+
+    if (selectedCategory === 'hotel') {
+        closeModal('quickAddModal');
+        openHotelModal(currentName, currentLat, currentLon);
+    } else if (selectedCategory === 'vol') {
+        closeModal('quickAddModal');
+        openTransportModal('Transport', '🚆', currentName);
+    }
+}
+
+// 4. TIMELINE ET ITINÉRAIRE
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -213,8 +228,26 @@ function populateDaySelector() {
     }
 }
 
-// 4. HÔTEL MULTI-JOURS
-function openHotelModal() { document.getElementById('hotelModal').style.display = 'flex'; }
+// 5. MODALE HÔTEL MULTI-JOURS (PRÉ-REMPLISSAGE)
+function openHotelModal(defaultName = '', lat = null, lon = null) {
+    document.getElementById('hotelName').value = defaultName;
+    document.getElementById('hotelLat').value = lat || '';
+    document.getElementById('hotelLon').value = lon || '';
+
+    // Pré-remplissage des dates
+    const startDateInput = document.getElementById('dateStart').value;
+    if (startDateInput) {
+        let d = new Date(startDateInput);
+        d.setDate(d.getDate() + (activeDay - 1));
+        const formattedDate = d.toISOString().split('T')[0];
+        document.getElementById('hotelStart').value = formattedDate;
+        
+        d.setDate(d.getDate() + 1);
+        document.getElementById('hotelEnd').value = d.toISOString().split('T')[0];
+    }
+
+    document.getElementById('hotelModal').style.display = 'flex';
+}
 
 function saveHotel() {
     const name = document.getElementById('hotelName').value || 'Hôtel';
@@ -258,16 +291,21 @@ function saveHotel() {
     save();
 }
 
-// 5. TRANSPORTS
+// 6. TRANSPORTS
 function toggleTransportMenu() {
     const menu = document.getElementById('transportMenu');
     menu.style.display = menu.style.display === 'none' ? 'grid' : 'none';
 }
 
-function openTransportModal(type, icon) {
+function openTransportModal(type = 'Train', icon = '🚆', destinationName = '') {
     selectedTransportType = type;
     document.getElementById('transportModalTitle').innerText = `${icon} Transport (${type})`;
     document.getElementById('transportMenu').style.display = 'none';
+    
+    if (destinationName) {
+        document.getElementById('transTo').value = destinationName;
+    }
+
     document.getElementById('transportModal').style.display = 'flex';
 }
 
@@ -298,8 +336,13 @@ function saveTransport() {
     save();
 }
 
-// 6. AJOUT RAPIDE / UNIFIÉ
+// 7. MODALE GÉNÉRIQUE / AJOUT RAPIDE
 function openQuickAddModal(defaultType = 'activ', name = '', lat = null, lon = null) {
+    if (defaultType === 'hotel') {
+        openHotelModal(name, lat, lon);
+        return;
+    }
+
     populateDaySelector();
     document.getElementById('quickAddType').value = defaultType;
     document.getElementById('quickAddName').value = name;
@@ -341,7 +384,7 @@ function saveQuickAdd() {
 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-// 7. RENDU ET CALCULS
+// 8. RENDU DU PLANNING ET CALCUL DU BUDGET
 function renderBlocks() {
     const list = document.getElementById('blocksList');
     list.innerHTML = "";
