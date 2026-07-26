@@ -5,22 +5,22 @@ let itemMarkers = [];
 let searchMarker = null;
 let selectedTransportType = 'Train';
 
-// 1. INITIALISATION DE LA CARTE ET DÉTECTION DES CLICS
-function initMap(center = [46.3068, 4.8314], zoom = 7) { // Par défaut centré sur la France
+// 1. INITIALISATION DE LA CARTE AVEC CLIC DE PRÉCISION
+function initMap(center = [46.3068, 4.8314], zoom = 7) {
     if(map) map.remove();
     map = L.map('map').setView(center, zoom);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
         attribution: '&copy; OpenStreetMap' 
     }).addTo(map);
 
-    // Clic direct sur la carte pour récupérer le nom du lieu et ajouter un point
+    // Clic précis sur la carte
     map.on('click', async function(e) {
         const lat = e.latlng.lat;
         const lon = e.latlng.lng;
         
         let placeName = `Lieu (${lat.toFixed(3)}, ${lon.toFixed(3)})`;
         
-        // Reverse Geocoding via Nominatim
+        // Obtenir le nom exact par reverse geocoding
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, {
                 headers: { 'User-Agent': 'TravelPlannerApp/1.0' }
@@ -92,7 +92,7 @@ function populateDaySelector() {
     }
 }
 
-// 3. FONCTION DE RECHERCHE MONDIALE AVEC RECENTRAGE AUTOMATIQUE SUR LA CARTE
+// 3. RECHERCHE ET RECENTRAGE DE LA CARTE
 async function searchPlacesInApp() {
     const query = document.getElementById('wanderQuery').value.trim();
     if (!query) return;
@@ -100,21 +100,19 @@ async function searchPlacesInApp() {
     const panel = document.getElementById('search-results-panel');
     const list = document.getElementById('results-list');
     panel.style.display = 'block';
-    list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">🔍 Recherche de "${query}"...</div>`;
+    list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">🔍 Recherche...</div>`;
 
     try {
-        // Recherche globale sans Bounding Box restrictive
         const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
         const res = await fetch(searchUrl, { headers: { 'User-Agent': 'TravelPlannerApp/1.0' } });
         const data = await res.json();
 
         list.innerHTML = "";
         if (!data || data.length === 0) {
-            list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">Aucun résultat trouvé.<br><button class="btn-main btn-primary" style="margin-top:5px; font-size:0.75rem;" onclick="openQuickAddModal('activ', '${query.replace(/'/g, "\\'")}')">Ajouter manuellement</button></div>`;
+            list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">Aucun résultat.<br><button class="btn-main btn-primary" style="margin-top:5px; font-size:0.75rem;" onclick="openQuickAddModal('activ', '${query.replace(/'/g, "\\'")}')">Ajouter manuellement</button></div>`;
             return;
         }
 
-        // Si une ville/lieu est trouvé, recentrer immédiatement la carte sur le premier résultat !
         const topResult = data[0];
         const lat = parseFloat(topResult.lat);
         const lon = parseFloat(topResult.lon);
@@ -141,7 +139,7 @@ async function searchPlacesInApp() {
 
     } catch(e) {
         console.error(e);
-        list.innerHTML = `<div style="font-size:0.8rem; color:red; padding:5px;">Erreur de connexion lors de la recherche.</div>`;
+        list.innerHTML = `<div style="font-size:0.8rem; color:red; padding:5px;">Erreur de connexion.</div>`;
     }
 }
 
@@ -152,7 +150,7 @@ function addBlockFromSearch(name, lat, lon) {
 
 function closeResults() { document.getElementById('search-results-panel').style.display = 'none'; }
 
-// 4. GESTION DES HÔTELS MULTI-JOURS
+// 4. HÔTEL MULTI-JOURS
 function openHotelModal() { document.getElementById('hotelModal').style.display = 'flex'; }
 
 function saveHotel() {
@@ -194,7 +192,7 @@ function saveHotel() {
     save();
 }
 
-// 5. GESTION TRANSPORTS
+// 5. TRANSPORTS
 function toggleTransportMenu() {
     const menu = document.getElementById('transportMenu');
     menu.style.display = menu.style.display === 'none' ? 'grid' : 'none';
@@ -234,7 +232,7 @@ function saveTransport() {
     save();
 }
 
-// 6. AJOUT MODAL ET CHOIX DE JOUR ET DE CATÉGORIE
+// 6. AJOUT EN UN CLIC
 function openQuickAddModal(defaultType = 'activ', name = '', lat = null, lon = null) {
     populateDaySelector();
     document.getElementById('quickAddType').value = defaultType;
@@ -253,7 +251,6 @@ function saveQuickAdd() {
     const lat = parseFloat(document.getElementById('quickAddLat').value) || null;
     const lon = parseFloat(document.getElementById('quickAddLon').value) || null;
 
-    // Prefixes d'icônes
     const icons = { hotel: '🏨 ', vol: '🚆 ', activ: '🎟️ ', resto: '🍴 ' };
     if (!name.match(/^(🏨|🚆|🎟️|🍴)/)) {
         name = (icons[type] || '') + name;
@@ -278,7 +275,7 @@ function saveQuickAdd() {
 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-// 7. RENDU DES ÉVÉNEMENTS DU JOUR ET DE LA SYNTHÈSE
+// 7. CALCUL DU BUDGET TOTAL & PAR PERSONNE
 function renderBlocks() {
     const list = document.getElementById('blocksList');
     list.innerHTML = "";
@@ -289,10 +286,10 @@ function renderBlocks() {
         div.className = `trip-block block-${b.type}`;
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <strong style="font-size:0.9rem;">${b.name}</strong>
+                <strong style="font-size:0.85rem;">${b.name}</strong>
                 <div>
                     <span style="font-weight:bold; color:var(--accent);">${b.price.toFixed(2)}${cur}</span>
-                    <button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer; margin-left:8px;">✕</button>
+                    <button onclick="delB(${b.id})" style="border:none; background:none; cursor:pointer; margin-left:6px;">✕</button>
                 </div>
             </div>
             <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
@@ -306,6 +303,21 @@ function renderBlocks() {
     updateTotal();
     updateMapMarkers();
     renderCategoriesRecap();
+}
+
+function updateTotal() {
+    let total = 0;
+    const cur = document.getElementById('currency').value;
+    const paxCount = Math.max(1, parseInt(document.getElementById('pax').value) || 1);
+
+    Object.values(tripData).forEach(dayBlocks => {
+        dayBlocks.forEach(b => total += (parseFloat(b.price) || 0));
+    });
+
+    const perPax = total / paxCount;
+
+    document.getElementById('totalLabel').innerText = total.toFixed(2) + cur;
+    document.getElementById('perPaxLabel').innerText = perPax.toFixed(2) + cur;
 }
 
 function renderCategoriesRecap() {
@@ -350,17 +362,6 @@ function delB(id) {
     tripData[activeDay] = tripData[activeDay].filter(x => x.id !== id);
     renderBlocks();
     save();
-}
-
-function updateTotal() {
-    let total = 0;
-    const cur = document.getElementById('currency').value;
-
-    Object.values(tripData).forEach(dayBlocks => {
-        dayBlocks.forEach(b => total += (parseFloat(b.price) || 0));
-    });
-
-    document.getElementById('totalLabel').innerText = total.toFixed(2) + cur;
 }
 
 function updateMapMarkers() {
