@@ -16,38 +16,46 @@
             <button class="lang-switch" onclick="toggleDarkMode()">🌙</button>
             <button class="lang-switch" onclick="toggleLang()">FR / EN</button>
         </div>
-        <h1>Explorez le monde ✈️</h1>
-        <p>Préparez votre itinéraire sur-mesure</p>
+        <h1 data-i18n="appTitle">Explorez le monde ✈️</h1>
+        <p data-i18n="appSubtitle">Préparez votre itinéraire sur-mesure</p>
     </div>
 
-    <!-- BARRE DE CONFIGURATION -->
+    <!-- BARRE DE CONFIGURATION ET POLARSTEPS -->
     <div class="search-bar">
-        <div>
-            <label>DÉPART</label>
-            <input type="text" id="cityStart" placeholder="Ex: Paris">
+        <div class="search-fields">
+            <div>
+                <label data-i18n="lblStart">DÉPART</label>
+                <input type="text" id="cityStart" placeholder="Ex: Paris">
+            </div>
+            <div>
+                <label data-i18n="lblEnd">ARRIVÉE</label>
+                <input type="text" id="cityEnd" placeholder="Ex: Ajaccio">
+            </div>
+            <div>
+                <label data-i18n="lblFrom">DU</label>
+                <input type="date" id="dateStart" onchange="generateTimeline()">
+            </div>
+            <div>
+                <label data-i18n="lblTo">AU</label>
+                <input type="date" id="dateEnd" onchange="generateTimeline()">
+            </div>
+            <div>
+                <label data-i18n="lblCurrency">DEVISE</label>
+                <select id="currency" onchange="saveAndRefresh()">
+                    <option value="€">€ (EUR)</option>
+                    <option value="$">$ (USD)</option>
+                </select>
+            </div>
+            <div>
+                <label data-i18n="lblPax">VOYAGEURS</label>
+                <input type="number" id="pax" value="1" min="1" style="width:55px;" onchange="saveAndRefresh()">
+            </div>
         </div>
-        <div>
-            <label>ARRIVÉE</label>
-            <input type="text" id="cityEnd" placeholder="Ex: Ajaccio">
-        </div>
-        <div>
-            <label>DU</label>
-            <input type="date" id="dateStart" onchange="generateTimeline()">
-        </div>
-        <div>
-            <label>AU</label>
-            <input type="date" id="dateEnd" onchange="generateTimeline()">
-        </div>
-        <div>
-            <label>DEVISE</label>
-            <select id="currency" onchange="saveAndRefresh()">
-                <option value="€">€ (EUR)</option>
-                <option value="$">$ (USD)</option>
-            </select>
-        </div>
-        <div>
-            <label>VOYAGEURS</label>
-            <input type="number" id="pax" value="1" min="1" style="width:55px;" onchange="saveAndRefresh()">
+        
+        <div class="polarsteps-wrapper">
+            <a href="https://www.polarsteps.com" target="_blank" class="btn-polarsteps" title="Ouvrir Polarsteps">
+                📍 Polarsteps
+            </a>
         </div>
     </div>
 
@@ -59,12 +67,12 @@
             
             <!-- TIMELINE -->
             <div class="column-timeline scrollable">
-                <h3>🗓️ Itinéraire</h3>
+                <h3 data-i18n="titleTimeline">🗓️ Itinéraire</h3>
                 <div id="timelineArea"></div>
                 <hr class="separator">
                 <div class="btn-group">
-                    <button class="btn-main btn-danger" onclick="clearAll()">🗑️ Tout effacer</button>
-                    <button class="btn-main btn-primary" onclick="downloadData()">💾 Sauvegarder</button>
+                    <button class="btn-main btn-danger" onclick="clearAll()" data-i18n="btnClear">🗑️ Tout effacer</button>
+                    <button class="btn-main btn-primary" onclick="downloadData()" data-i18n="btnSave">💾 Sauvegarder</button>
                 </div>
             </div>
 
@@ -78,15 +86,15 @@
                         <input type="text" id="wanderQuery" placeholder="🔎 Ville, hôtel, lieu..." onkeydown="handleSearchKeyDown(event)" oninput="handleLiveSearch(this.value)">
                         <button type="button" class="clear-btn" onclick="clearSearchInput('wanderQuery', 'search-results-panel')">✕</button>
                     </div>
-                    <button class="btn-main btn-primary search-btn" onclick="triggerManualSearch()">Rechercher</button>
+                    <button class="btn-main btn-primary search-btn" onclick="triggerManualSearch()" data-i18n="btnSearch">Rechercher</button>
                 </div>
 
                 <!-- BOUTONS FILTRES -->
                 <div class="quick-filters">
-                    <button class="chip chip-hotel" onclick="openHotelModal()">🏨 Hébergement</button>
-                    <button class="chip chip-vol" onclick="toggleTransportMenu()">🚆 Transport</button>
-                    <button class="chip chip-activ" onclick="openQuickAddModal('activ')">🎟️ Activités</button>
-                    <button class="chip chip-resto" onclick="openQuickAddModal('resto')">🍴 Restaurants</button>
+                    <button class="chip chip-hotel" onclick="openHotelModal()" data-i18n="chipHotel">🏨 Hébergement</button>
+                    <button class="chip chip-vol" onclick="toggleTransportMenu()" data-i18n="chipTransport">🚆 Transport</button>
+                    <button class="chip chip-activ" onclick="openQuickAddModal('activ')" data-i18n="chipActiv">🎟️ Activités</button>
+                    <button class="chip chip-resto" onclick="openQuickAddModal('resto')" data-i18n="chipResto">🍴 Restaurants</button>
                 </div>
 
                 <!-- DROPDOWN TRANSPORT -->
@@ -101,7 +109,7 @@
                 <!-- RÉSULTATS DE RECHERCHE -->
                 <div id="search-results-panel" class="results-panel" style="display:none;">
                     <div class="results-header">
-                        <h4>Résultats trouvés</h4>
+                        <h4 data-i18n="titleSearchResults">Résultats trouvés</h4>
                         <button onclick="closeResults()">✕</button>
                     </div>
                     <div id="results-list"></div>
@@ -116,30 +124,34 @@
         <!-- SECTION DROITE -->
         <div class="right-section scrollable">
             <div id="map"></div>
-            <small class="map-hint">📍 Cliquez sur la carte pour ajouter un lieu | Les pointeurs offrent des liens GPS (Google, Apple, Waze)</small>
+            <small class="map-hint" data-i18n="mapHint">📍 Cliquez sur la carte pour ajouter un lieu | Les pointeurs offrent des liens GPS (Google, Apple, Waze)</small>
 
             <!-- CARTE DU BUDGET -->
             <div class="budget-card">
                 <div class="budget-row">
                     <div>
-                        <small>TOTAL DU VOYAGE</small>
+                        <small data-i18n="lblTotalBudget">TOTAL DU VOYAGE</small>
                         <h1 id="totalLabel">0.00€</h1>
                     </div>
                     <div class="budget-divider"></div>
                     <div>
-                        <small>PAR PERSONNE</small>
+                        <small data-i18n="lblPerPax">PAR PERSONNE</small>
                         <h2 id="perPaxLabel">0.00€</h2>
                     </div>
+                </div>
+                <!-- RÉPARTITION PAR VOYAGEUR -->
+                <div class="payer-breakdown" id="payerBreakdownContainer">
+                    <!-- Généré dynamiquement -->
                 </div>
             </div>
 
             <!-- SYNTHÈSE PAR CATÉGORIES -->
             <div class="categories-recap">
-                <h3>🗂️ Synthèse par Catégories</h3>
+                <h3 data-i18n="titleCategoryRecap">🗂️ Synthèse par Catégories</h3>
                 
                 <div class="cat-section">
                     <div class="cat-header cat-hotel">
-                        <span>🏨 Hébergements</span>
+                        <span data-i18n="catHotels">🏨 Hébergements</span>
                         <button onclick="openHotelModal()">+</button>
                     </div>
                     <div id="cat-list-hotel" class="cat-list"></div>
@@ -147,7 +159,7 @@
 
                 <div class="cat-section">
                     <div class="cat-header cat-vol">
-                        <span>🚆 Transports</span>
+                        <span data-i18n="catTransports">🚆 Transports</span>
                         <button onclick="toggleTransportMenu()">+</button>
                     </div>
                     <div id="cat-list-vol" class="cat-list"></div>
@@ -155,7 +167,7 @@
 
                 <div class="cat-section">
                     <div class="cat-header cat-activ">
-                        <span>🎟️ Activités</span>
+                        <span data-i18n="catActivities">🎟️ Activités</span>
                         <button onclick="openQuickAddModal('activ')">+</button>
                     </div>
                     <div id="cat-list-activ" class="cat-list"></div>
@@ -163,7 +175,7 @@
 
                 <div class="cat-section">
                     <div class="cat-header cat-resto">
-                        <span>🍴 Restaurants</span>
+                        <span data-i18n="catRestaurants">🍴 Restaurants</span>
                         <button onclick="openQuickAddModal('resto')">+</button>
                     </div>
                     <div id="cat-list-resto" class="cat-list"></div>
@@ -177,9 +189,9 @@
     <!-- MODAL : HÔTEL MULTI-JOURS -->
     <div id="hotelModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
-            <h3>🏨 Ajouter un Hébergement</h3>
+            <h3 data-i18n="modalHotelTitle">🏨 Ajouter un Hébergement</h3>
             
-            <label>Libellé personnalisé / Nom</label>
+            <label data-i18n="lblLabelName">Libellé personnalisé / Nom</label>
             <div class="search-input-wrapper">
                 <input type="text" id="hotelName" placeholder="Ex: Hôtel Mercure Centre..." oninput="handleModalLiveSearch(this.value, 'hotelModalResults', selectHotelAddress)">
                 <button type="button" class="clear-btn" onclick="clearSearchInput('hotelName', 'hotelModalResults')">✕</button>
@@ -191,27 +203,27 @@
 
             <div class="grid-2">
                 <div>
-                    <label>Check-in</label>
+                    <label data-i18n="lblCheckin">Check-in</label>
                     <input type="date" id="hotelStart">
                 </div>
                 <div>
-                    <label>Check-out</label>
+                    <label data-i18n="lblCheckout">Check-out</label>
                     <input type="date" id="hotelEnd">
                 </div>
             </div>
             <div class="grid-2">
                 <div>
-                    <label>Prix Total</label>
+                    <label data-i18n="lblTotalPrice">Prix Total</label>
                     <input type="number" id="hotelPrice" placeholder="0">
                 </div>
                 <div>
-                    <label>Payé par</label>
+                    <label data-i18n="lblPaidBy">Payé par</label>
                     <input type="text" id="hotelPayer" value="Moi">
                 </div>
             </div>
             <div class="modal-actions">
-                <button onclick="closeModal('hotelModal')" class="btn-main btn-secondary">Annuler</button>
-                <button onclick="saveHotel()" class="btn-main btn-hotel">Enregistrer</button>
+                <button onclick="closeModal('hotelModal')" class="btn-main btn-secondary" data-i18n="btnCancel">Annuler</button>
+                <button onclick="saveHotel()" class="btn-main btn-hotel" data-i18n="btnSave">Enregistrer</button>
             </div>
         </div>
     </div>
@@ -222,59 +234,59 @@
             <h3 id="transportModalTitle">🚆 Ajouter un Transport</h3>
             <div class="grid-2">
                 <div>
-                    <label>Lieu de Départ</label>
+                    <label data-i18n="lblFromLoc">Lieu de Départ</label>
                     <input type="text" id="transFrom" placeholder="Ex: Nice">
                 </div>
                 <div>
-                    <label>Lieu d'Arrivée</label>
+                    <label data-i18n="lblToLoc">Lieu d'Arrivée</label>
                     <input type="text" id="transTo" placeholder="Ex: Ajaccio">
                 </div>
                 <div>
-                    <label>Départ (Date/Heure)</label>
+                    <label data-i18n="lblDepTime">Départ (Date/Heure)</label>
                     <input type="datetime-local" id="transDateStart">
                 </div>
                 <div>
-                    <label>Arrivée (Date/Heure)</label>
+                    <label data-i18n="lblArrTime">Arrivée (Date/Heure)</label>
                     <input type="datetime-local" id="transDateEnd">
                 </div>
                 <div>
-                    <label>Compagnie</label>
+                    <label data-i18n="lblCompany">Compagnie</label>
                     <input type="text" id="transCompany" placeholder="Ex: Corsica Ferries">
                 </div>
                 <div>
-                    <label>N° Confirmation</label>
+                    <label data-i18n="lblCode">N° Confirmation</label>
                     <input type="text" id="transCode" placeholder="Ex: CF-98213">
                 </div>
                 <div>
-                    <label>Coût</label>
+                    <label data-i18n="lblCost">Coût</label>
                     <input type="number" id="transCost" placeholder="0">
                 </div>
                 <div>
-                    <label>Payé par</label>
+                    <label data-i18n="lblPaidBy">Payé par</label>
                     <input type="text" id="transPayer" value="Moi">
                 </div>
             </div>
             <div class="modal-actions">
-                <button onclick="closeModal('transportModal')" class="btn-main btn-secondary">Annuler</button>
-                <button onclick="saveTransport()" class="btn-main btn-vol">Enregistrer</button>
+                <button onclick="closeModal('transportModal')" class="btn-main btn-secondary" data-i18n="btnCancel">Annuler</button>
+                <button onclick="saveTransport()" class="btn-main btn-vol" data-i18n="btnSave">Enregistrer</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL : AJOUT RAPIDE / GÉNÉRIQUE -->
+    <!-- MODAL : AJOUT RAPIDE -->
     <div id="quickAddModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
-            <h3 id="quickAddTitle">Ajouter un élément</h3>
+            <h3 id="quickAddTitle" data-i18n="titleQuickAdd">Ajouter un élément</h3>
             <input type="hidden" id="quickAddLat">
             <input type="hidden" id="quickAddLon">
             
             <div class="grid-2">
                 <div>
-                    <label>Jour concerné</label>
+                    <label data-i18n="lblDayTarget">Jour concerné</label>
                     <select id="quickAddDaySelect"></select>
                 </div>
                 <div>
-                    <label>Catégorie</label>
+                    <label data-i18n="lblCategory">Catégorie</label>
                     <select id="quickAddType" onchange="handleCategoryChange(this.value)">
                         <option value="activ">🎟️ Activité</option>
                         <option value="resto">🍴 Restaurant</option>
@@ -284,7 +296,7 @@
                 </div>
             </div>
 
-            <label>Libellé personnalisé / Nom</label>
+            <label data-i18n="lblLabelName">Libellé personnalisé / Nom</label>
             <div class="search-input-wrapper">
                 <input type="text" id="quickAddName" placeholder="Saisissez ou recherchez un nom..." oninput="handleModalLiveSearch(this.value, 'quickAddModalResults', selectQuickAddAddress)">
                 <button type="button" class="clear-btn" onclick="clearSearchInput('quickAddName', 'quickAddModalResults')">✕</button>
@@ -293,17 +305,17 @@
             
             <div class="grid-2">
                 <div>
-                    <label>Prix</label>
+                    <label data-i18n="lblPrice">Prix</label>
                     <input type="number" id="quickAddPrice" placeholder="0">
                 </div>
                 <div>
-                    <label>Heure</label>
+                    <label data-i18n="lblTime">Heure</label>
                     <input type="time" id="quickAddTime" value="12:00">
                 </div>
             </div>
             <div class="modal-actions">
-                <button onclick="closeModal('quickAddModal')" class="btn-main btn-secondary">Annuler</button>
-                <button onclick="saveQuickAdd()" class="btn-main btn-primary">Valider & Ajouter</button>
+                <button onclick="closeModal('quickAddModal')" class="btn-main btn-secondary" data-i18n="btnCancel">Annuler</button>
+                <button onclick="saveQuickAdd()" class="btn-main btn-primary" data-i18n="btnValidate">Valider & Ajouter</button>
             </div>
         </div>
     </div>
@@ -311,39 +323,39 @@
     <!-- MODAL : ÉDITION DÉDIÉE -->
     <div id="editModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
-            <h3>✏️ Modifier l'événement</h3>
+            <h3 data-i18n="titleEditEvent">✏️ Modifier l'événement</h3>
             <input type="hidden" id="editId">
             <input type="hidden" id="editDay">
             <input type="hidden" id="editBookingId">
 
-            <label>Libellé / Nom</label>
+            <label data-i18n="lblLabelName">Libellé / Nom</label>
             <input type="text" id="editName">
 
             <div class="grid-2">
                 <div>
-                    <label>Prix</label>
+                    <label data-i18n="lblPrice">Prix</label>
                     <input type="number" id="editPrice">
                 </div>
                 <div>
-                    <label>Heure</label>
+                    <label data-i18n="lblTime">Heure</label>
                     <input type="time" id="editTime">
                 </div>
             </div>
 
             <div class="grid-2">
                 <div>
-                    <label>Payé par</label>
+                    <label data-i18n="lblPaidBy">Payé par</label>
                     <input type="text" id="editPaidBy">
                 </div>
                 <div>
-                    <label>Notes / Détails</label>
+                    <label data-i18n="lblNotes">Notes / Détails</label>
                     <input type="text" id="editNotes">
                 </div>
             </div>
 
             <div class="modal-actions">
-                <button onclick="closeModal('editModal')" class="btn-main btn-secondary">Annuler</button>
-                <button onclick="saveEdit()" class="btn-main btn-primary">Mettre à jour</button>
+                <button onclick="closeModal('editModal')" class="btn-main btn-secondary" data-i18n="btnCancel">Annuler</button>
+                <button onclick="saveEdit()" class="btn-main btn-primary" data-i18n="btnUpdate">Mettre à jour</button>
             </div>
         </div>
     </div>
