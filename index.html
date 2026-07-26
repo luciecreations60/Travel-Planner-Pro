@@ -68,7 +68,7 @@
                 </div>
             </div>
 
-            <!-- SOUS-COLONNE 2 : CONTENU DU JOUR SELECTIONNÉ -->
+            <!-- SOUS-COLONNE 2 : CONTENU DU JOUR SÉLECTIONNÉ -->
             <div class="column-day-content scrollable">
                 <h2 id="currentDayTitle">Jour 1</h2>
                 
@@ -171,7 +171,7 @@
 
     </div>
 
-    <!-- MODAL : HÔTEL MULTI-JOURS (AVEC RECHERCHE EN DIRECT) -->
+    <!-- MODAL : HÔTEL MULTI-JOURS (DÉDIÉE) -->
     <div id="hotelModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3>🏨 Ajouter un Hébergement</h3>
@@ -213,7 +213,7 @@
         </div>
     </div>
 
-    <!-- MODAL : TRANSPORT -->
+    <!-- MODAL : TRANSPORT (DÉDIÉE) -->
     <div id="transportModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3 id="transportModalTitle">🚆 Ajouter un Transport</h3>
@@ -264,7 +264,7 @@
         </div>
     </div>
 
-    <!-- MODAL UNIFIÉE : AJOUT RAPIDE -->
+    <!-- MODAL : AJOUT RAPIDE / GÉNÉRIQUE -->
     <div id="quickAddModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3 id="quickAddTitle">Ajouter un élément</h3>
@@ -278,7 +278,8 @@
                 </div>
                 <div>
                     <label>Catégorie</label>
-                    <select id="quickAddType">
+                    <!-- BASCULE AUTOMATIQUE VERS LA BONNE MODALE -->
+                    <select id="quickAddType" onchange="handleCategoryChange(this.value)">
                         <option value="activ">🎟️ Activité</option>
                         <option value="resto">🍴 Restaurant</option>
                         <option value="hotel">🏨 Hébergement</option>
