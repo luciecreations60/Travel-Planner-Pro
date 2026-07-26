@@ -1,4 +1,5 @@
 let activeDay = 1;
+let currentLang = 'fr';
 let tripData = JSON.parse(localStorage.getItem('travelPlannerData')) || {};
 let hotelBookings = JSON.parse(localStorage.getItem('hotelBookings')) || [];
 let map;
@@ -7,15 +8,134 @@ let searchMarker = null;
 let selectedTransportType = 'Train';
 let searchTimeout = null;
 
-const DAYS_SHORT = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
+const DAYS_SHORT_FR = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const DAYS_SHORT_EN = ['Sun.', 'Mon.', 'Tue.', 'Wed.', 'Thu.', 'Fri.', 'Sat.'];
 
-// COULEURS SVG PAR CATÉGORIE POUR LES MARQUEURS DE CARTE
 const CATEGORY_COLORS = {
-    hotel: '#f59e0b', // Orange / Ambre
-    vol: '#6366f1',   // Indigo / Bleu
-    activ: '#ec4899', // Rose
-    resto: '#10b981'  // Vert
+    hotel: '#f59e0b',
+    vol: '#6366f1',
+    activ: '#ec4899',
+    resto: '#10b981'
 };
+
+// TRADUCTIONS COMPLETE POUR LE MODE FR/EN
+const i18n = {
+    fr: {
+        appTitle: "Explorez le monde ✈️",
+        appSubtitle: "Préparez votre itinéraire sur-mesure",
+        lblStart: "DÉPART",
+        lblEnd: "ARRIVÉE",
+        lblFrom: "DU",
+        lblTo: "AU",
+        lblCurrency: "DEVISE",
+        lblPax: "VOYAGEURS",
+        titleTimeline: "🗓️ Itinéraire",
+        btnClear: "🗑️ Tout effacer",
+        btnSave: "💾 Sauvegarder",
+        btnSearch: "Rechercher",
+        chipHotel: "🏨 Hébergement",
+        chipTransport: "🚆 Transport",
+        chipActiv: "🎟️ Activités",
+        chipResto: "🍴 Restaurants",
+        titleSearchResults: "Résultats trouvés",
+        mapHint: "📍 Cliquez sur la carte pour ajouter un lieu | Les pointeurs offrent des liens GPS (Google, Apple, Waze)",
+        lblTotalBudget: "TOTAL DU VOYAGE",
+        lblPerPax: "PAR PERSONNE",
+        titleCategoryRecap: "🗂️ Synthèse par Catégories",
+        catHotels: "🏨 Hébergements",
+        catTransports: "🚆 Transports",
+        catActivities: "🎟️ Activités",
+        catRestaurants: "🍴 Restaurants",
+        modalHotelTitle: "🏨 Ajouter un Hébergement",
+        lblLabelName: "Libellé personnalisé / Nom",
+        lblCheckin: "Check-in",
+        lblCheckout: "Check-out",
+        lblTotalPrice: "Prix Total",
+        lblPaidBy: "Payé par",
+        btnCancel: "Annuler",
+        lblFromLoc: "Lieu de Départ",
+        lblToLoc: "Lieu d'Arrivée",
+        lblDepTime: "Départ (Date/Heure)",
+        lblArrTime: "Arrivée (Date/Heure)",
+        lblCompany: "Compagnie",
+        lblCode: "N° Confirmation",
+        lblCost: "Coût",
+        titleQuickAdd: "Ajouter un élément",
+        lblDayTarget: "Jour concerné",
+        lblCategory: "Catégorie",
+        lblPrice: "Prix",
+        lblTime: "Heure",
+        btnValidate: "Valider & Ajouter",
+        titleEditEvent: "✏️ Modifier l'événement",
+        lblNotes: "Notes / Détails",
+        btnUpdate: "Mettre à jour"
+    },
+    en: {
+        appTitle: "Explore the World ✈️",
+        appSubtitle: "Design your custom trip itinerary",
+        lblStart: "START",
+        lblEnd: "DESTINATION",
+        lblFrom: "FROM",
+        lblTo: "TO",
+        lblCurrency: "CURRENCY",
+        lblPax: "TRAVELERS",
+        titleTimeline: "🗓️ Itinerary",
+        btnClear: "🗑️ Clear All",
+        btnSave: "💾 Save",
+        btnSearch: "Search",
+        chipHotel: "🏨 Lodging",
+        chipTransport: "🚆 Transport",
+        chipActiv: "🎟️ Activities",
+        chipResto: "🍴 Dining",
+        titleSearchResults: "Search Results",
+        mapHint: "📍 Click map to add a place | Markers provide GPS directions (Google, Apple, Waze)",
+        lblTotalBudget: "TRIP TOTAL",
+        lblPerPax: "PER PERSON",
+        titleCategoryRecap: "🗂️ Category Summary",
+        catHotels: "🏨 Accommodations",
+        catTransports: "🚆 Transports",
+        catActivities: "🎟️ Activities",
+        catRestaurants: "🍴 Restaurants",
+        modalHotelTitle: "🏨 Add Accommodation",
+        lblLabelName: "Name / Label",
+        lblCheckin: "Check-in",
+        lblCheckout: "Check-out",
+        lblTotalPrice: "Total Price",
+        lblPaidBy: "Paid by",
+        btnCancel: "Cancel",
+        lblFromLoc: "Departure Place",
+        lblToLoc: "Arrival Place",
+        lblDepTime: "Departure (Date/Time)",
+        lblArrTime: "Arrival (Date/Time)",
+        lblCompany: "Company",
+        lblCode: "Confirmation #",
+        lblCost: "Cost",
+        titleQuickAdd: "Add New Item",
+        lblDayTarget: "Target Day",
+        lblCategory: "Category",
+        lblPrice: "Price",
+        lblTime: "Time",
+        btnValidate: "Add Item",
+        titleEditEvent: "✏️ Edit Event",
+        lblNotes: "Notes / Details",
+        btnUpdate: "Update"
+    }
+};
+
+function toggleLang() {
+    currentLang = currentLang === 'fr' ? 'en' : 'fr';
+    applyLanguage();
+    generateTimeline();
+}
+
+function applyLanguage() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (i18n[currentLang][key]) {
+            el.innerText = i18n[currentLang][key];
+        }
+    });
+}
 
 function createColoredMarkerIcon(colorHex) {
     const svgMarker = `
@@ -220,7 +340,7 @@ function handleCategoryChange(selectedCategory) {
     }
 }
 
-// 3. TIMELINE
+// 3. TIMELINE (RESTITUÉE SELON EXIGENCES : J1 ven. 28 août)
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -232,6 +352,9 @@ function generateTimeline() {
     let endDate = new Date(endI);
     let d = 1;
 
+    const daysArr = currentLang === 'fr' ? DAYS_SHORT_FR : DAYS_SHORT_EN;
+    const locale = currentLang === 'fr' ? 'fr-FR' : 'en-US';
+
     while(curr <= endDate) {
         if(!tripData[d]) tripData[d] = [];
         let item = document.createElement('div');
@@ -239,10 +362,10 @@ function generateTimeline() {
         let currentDayNum = d;
         item.onclick = () => { activeDay = currentDayNum; updateDayTitle(); generateTimeline(); };
         
-        const dayOfWeek = DAYS_SHORT[curr.getDay()];
-        const dateStr = curr.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+        const dayOfWeek = daysArr[curr.getDay()];
+        const dateStr = curr.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
         
-        item.innerHTML = `<strong style="color:var(--accent);">${dayOfWeek} J${d}</strong> <small>(${dateStr})</small>`;
+        item.innerHTML = `<span class="day-item-tag">J${d}</span> <span>${dayOfWeek} ${dateStr}</span>`;
         area.appendChild(item);
         curr.setDate(curr.getDate() + 1); 
         d++;
@@ -250,7 +373,9 @@ function generateTimeline() {
     updateDayTitle(); populateDaySelector(); renderBlocks(); save();
 }
 
-function updateDayTitle() { document.getElementById('currentDayTitle').innerText = 'Jour ' + activeDay; }
+function updateDayTitle() { 
+    document.getElementById('currentDayTitle').innerText = (currentLang === 'fr' ? 'Jour ' : 'Day ') + activeDay; 
+}
 
 function populateDaySelector() {
     const select = document.getElementById('quickAddDaySelect');
@@ -260,7 +385,7 @@ function populateDaySelector() {
     for (let i = 1; i <= Math.max(totalDays, 14); i++) {
         let opt = document.createElement('option');
         opt.value = i;
-        opt.innerText = `Jour ${i}`;
+        opt.innerText = (currentLang === 'fr' ? 'Jour ' : 'Day ') + i;
         if (i === activeDay) opt.selected = true;
         select.appendChild(opt);
     }
@@ -305,12 +430,16 @@ function saveHotel() {
     const totalNights = Math.max(1, Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)));
     const pricePerNight = price / totalNights;
 
+    const startDay = Math.max(1, Math.round((startDate - tripStart) / (1000 * 60 * 60 * 24)) + 1);
+    const endDay = startDay + totalNights - 1;
+
     hotelBookings.push({
         id: bookingId,
         name,
         totalPrice: price,
         start, end,
-        startDay: Math.max(1, Math.round((startDate - tripStart) / (1000 * 60 * 60 * 24)) + 1),
+        startDay, endDay,
+        paidBy: payer,
         lat, lon
     });
 
@@ -430,7 +559,7 @@ function saveQuickAdd() {
     save();
 }
 
-// 5. FONCTIONS D'ÉDITION CORRIGÉES
+// 5. FONCTIONS D'ÉDITION
 function openEditModal(id, day, bookingId = null) {
     document.getElementById('editId').value = id || '';
     document.getElementById('editDay').value = day;
@@ -442,7 +571,7 @@ function openEditModal(id, day, bookingId = null) {
             document.getElementById('editName').value = booking.name;
             document.getElementById('editPrice').value = booking.totalPrice;
             document.getElementById('editTime').value = "15:00";
-            document.getElementById('editPaidBy').value = "Moi";
+            document.getElementById('editPaidBy').value = booking.paidBy || "Moi";
             document.getElementById('editNotes').value = `Hébergement (${booking.start} au ${booking.end})`;
         }
     } else {
@@ -474,6 +603,7 @@ function saveEdit() {
         if (booking) {
             booking.name = newName;
             booking.totalPrice = newPrice;
+            booking.paidBy = newPaidBy;
         }
         Object.keys(tripData).forEach(d => {
             tripData[d].forEach(item => {
@@ -532,19 +662,47 @@ function renderBlocks() {
     renderCategoriesRecap();
 }
 
+// MISE À JOUR : CALCUL PAR PERSONNE ET RÉPARTITION
 function updateTotal() {
     let total = 0;
     const cur = document.getElementById('currency').value;
     const paxCount = Math.max(1, parseInt(document.getElementById('pax').value) || 1);
+    const payerTotals = {};
 
-    Object.values(tripData).forEach(dayBlocks => {
-        dayBlocks.forEach(b => total += (parseFloat(b.price) || 0));
+    // Traitement des hébergements globaux
+    hotelBookings.forEach(booking => {
+        const payer = booking.paidBy || 'Moi';
+        payerTotals[payer] = (payerTotals[payer] || 0) + booking.totalPrice;
     });
 
+    // Traitement des éléments hors hébergements (évite les doublons)
+    Object.values(tripData).forEach(dayBlocks => {
+        dayBlocks.forEach(b => {
+            if (b.type !== 'hotel') {
+                const payer = b.paidBy || 'Moi';
+                payerTotals[payer] = (payerTotals[payer] || 0) + (parseFloat(b.price) || 0);
+            }
+        });
+    });
+
+    total = Object.values(payerTotals).reduce((a, b) => a + b, 0);
     const perPax = total / paxCount;
 
     document.getElementById('totalLabel').innerText = total.toFixed(2) + cur;
     document.getElementById('perPaxLabel').innerText = perPax.toFixed(2) + cur;
+
+    // Rendu de la répartition dynamique
+    const breakdownContainer = document.getElementById('payerBreakdownContainer');
+    breakdownContainer.innerHTML = "";
+
+    if (Object.keys(payerTotals).length > 0) {
+        Object.entries(payerTotals).forEach(([payer, amount]) => {
+            let chip = document.createElement('div');
+            chip.className = 'payer-chip';
+            chip.innerText = `👤 ${payer} : ${amount.toFixed(2)}${cur}`;
+            breakdownContainer.appendChild(chip);
+        });
+    }
 }
 
 function renderCategoriesRecap() {
@@ -559,7 +717,6 @@ function renderCategoriesRecap() {
         });
     });
 
-    // 1. Catégorie Hébergements
     const hotelContainer = document.getElementById('cat-list-hotel');
     hotelContainer.innerHTML = "";
     if (hotelBookings.length === 0) {
@@ -581,7 +738,6 @@ function renderCategoriesRecap() {
         });
     }
 
-    // 2. Transports, Activités & Restaurants
     ['vol', 'activ', 'resto'].forEach(cat => {
         const catContainer = document.getElementById(`cat-list-${cat}`);
         catContainer.innerHTML = "";
@@ -614,22 +770,40 @@ function goToDay(dayNum, lat = null, lon = null) {
     if (lat && lon) map.setView([lat, lon], 14);
 }
 
-// 7. CARTE AVEC MARQUEURS COLORÉS PAR CATÉGORIE
+// 7. POP-UP CARTE AMÉLIORÉE POUR LES SÉJOURS HÔTELS MULTI-JOURS
 function updateMapMarkers() {
     itemMarkers.forEach(m => map.removeLayer(m));
     itemMarkers = [];
 
+    const processedBookingIds = new Set();
+
     Object.entries(tripData).forEach(([dayNum, items]) => {
         items.forEach(b => {
             if (b.lat && b.lon) {
+                
+                // Si hébergement multi-jours, éviter les doublons de marqueurs
+                if (b.bookingId) {
+                    if (processedBookingIds.has(b.bookingId)) return;
+                    processedBookingIds.add(b.bookingId);
+                }
+
+                let dayLabel = `Jour ${dayNum}`;
+                
+                if (b.bookingId) {
+                    const booking = hotelBookings.find(h => h.id === b.bookingId);
+                    if (booking) {
+                        dayLabel = (booking.startDay === booking.endDay) ? `Jour ${booking.startDay}` : `Jours ${booking.startDay} ➔ ${booking.endDay}`;
+                    }
+                }
+
                 const title = encodeURIComponent(b.name.replace(/^(🏨|🚆|🎟️|🍴)\s*/, ''));
                 const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lon}`;
                 const appleUrl = `https://maps.apple.com/?q=${title}&ll=${b.lat},${b.lon}`;
                 const wazeUrl = `https://waze.com/ul?ll=${b.lat},${b.lon}&navigate=yes`;
 
                 let popupContent = `
-                    <div style="font-size:0.8rem; font-weight:bold;">${b.name}</div>
-                    <div style="font-size:0.7rem; color:gray;">Jour ${dayNum} - ${b.time}</div>
+                    <div style="font-size:0.85rem; font-weight:bold;">${b.name}</div>
+                    <div style="font-size:0.75rem; color:gray; margin-top:2px;">${dayLabel} - ${b.time}</div>
                     <div class="map-popup-actions">
                         <a href="${gmapsUrl}" target="_blank" class="map-popup-btn btn-gmaps">Google</a>
                         <a href="${appleUrl}" target="_blank" class="map-popup-btn btn-apple">Apple</a>
