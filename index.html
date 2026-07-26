@@ -72,13 +72,13 @@
             <div class="column-day-content scrollable">
                 <h2 id="currentDayTitle">Jour 1</h2>
                 
-                <!-- RECHERCHE GLOBALE -->
-                <div class="wander-search-box">
-                    <input type="text" id="wanderQuery" placeholder="🔎 Ville ou lieu..." onkeyup="if(event.key==='Enter') searchPlacesInApp()">
-                    <button onclick="searchPlacesInApp()" class="btn-search">Chercher</button>
+                <!-- RECHERCHE GLOBALE AU FIL DE LA SAISIE + CROIX -->
+                <div class="search-input-wrapper">
+                    <input type="text" id="wanderQuery" placeholder="🔎 Ville, hôtel, lieu..." oninput="handleLiveSearch(this.value)">
+                    <button type="button" class="clear-btn" id="clearWanderSearch" onclick="clearSearchInput('wanderQuery', 'search-results-panel')">✕</button>
                 </div>
 
-                <!-- BOUTONS CONTOUR (OUTLINE) -->
+                <!-- BOUTONS FILTRES -->
                 <div class="quick-filters">
                     <button class="chip chip-hotel" onclick="openHotelModal()">🏨 Hébergement</button>
                     <button class="chip chip-vol" onclick="toggleTransportMenu()">🚆 Transport</button>
@@ -95,7 +95,7 @@
                     <div class="transport-opt" onclick="openTransportModal('Voiture', '🚗')">🚗 Voiture</div>
                 </div>
 
-                <!-- RÉSULTATS DE RECHERCHE -->
+                <!-- RÉSULTATS DE RECHERCHE EN DIRECT -->
                 <div id="search-results-panel" class="results-panel" style="display:none;">
                     <div class="results-header">
                         <h4>Résultats trouvés</h4>
@@ -110,13 +110,12 @@
 
         </div>
 
-        <!-- SECTION DROITE : GRANDE CARTE (50%) & SYNTHÈSE -->
+        <!-- SECTION DROITE : CARTE & SYNTHÈSE -->
         <div class="right-section scrollable">
-            <!-- CARTE AGRANDIE (HAUTEUR IMPORTANTE ET PRÉCISE) -->
             <div id="map"></div>
             <small class="map-hint">📍 Cliquez sur la carte pour capturer précisément un lieu et l'ajouter</small>
 
-            <!-- CARTE DU BUDGET (TOTAL + PAR PERSONNE) -->
+            <!-- CARTE DU BUDGET -->
             <div class="budget-card">
                 <div class="budget-row">
                     <div>
@@ -131,7 +130,7 @@
                 </div>
             </div>
 
-            <!-- RÉSUMÉ PAR CATÉGORIES -->
+            <!-- SYNTHÈSE PAR CATÉGORIES -->
             <div class="categories-recap">
                 <h3>🗂️ Synthèse par Catégories</h3>
                 
@@ -172,12 +171,21 @@
 
     </div>
 
-    <!-- MODAL : HÔTEL MULTI-JOURS -->
+    <!-- MODAL : HÔTEL MULTI-JOURS (AVEC RECHERCHE EN DIRECT) -->
     <div id="hotelModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3>🏨 Ajouter un Hébergement</h3>
-            <label>Nom de l'établissement</label>
-            <input type="text" id="hotelName" placeholder="Ex: Camping L'esplanade">
+            
+            <label>Recherche de l'établissement</label>
+            <div class="search-input-wrapper">
+                <input type="text" id="hotelName" placeholder="Ex: Camping L'esplanade..." oninput="handleModalLiveSearch(this.value, 'hotelModalResults', selectHotelAddress)">
+                <button type="button" class="clear-btn" onclick="clearSearchInput('hotelName', 'hotelModalResults')">✕</button>
+            </div>
+            <div id="hotelModalResults" class="modal-live-results"></div>
+
+            <input type="hidden" id="hotelLat">
+            <input type="hidden" id="hotelLon">
+
             <div class="grid-2">
                 <div>
                     <label>Check-in</label>
@@ -212,11 +220,17 @@
             <div class="grid-2">
                 <div>
                     <label>Lieu de Départ</label>
-                    <input type="text" id="transFrom" placeholder="Ex: Nice">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="transFrom" placeholder="Ex: Nice">
+                        <button type="button" class="clear-btn" onclick="clearSearchInput('transFrom')">✕</button>
+                    </div>
                 </div>
                 <div>
                     <label>Lieu d'Arrivée</label>
-                    <input type="text" id="transTo" placeholder="Ex: Ajaccio">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="transTo" placeholder="Ex: Ajaccio">
+                        <button type="button" class="clear-btn" onclick="clearSearchInput('transTo')">✕</button>
+                    </div>
                 </div>
                 <div>
                     <label>Départ (Date/Heure)</label>
@@ -250,7 +264,7 @@
         </div>
     </div>
 
-    <!-- MODAL UNIFIÉE : AJOUT RAPIDE / CLIC CARTE -->
+    <!-- MODAL UNIFIÉE : AJOUT RAPIDE -->
     <div id="quickAddModal" class="modal-bg" style="display:none;">
         <div class="modal-box">
             <h3 id="quickAddTitle">Ajouter un élément</h3>
@@ -274,7 +288,11 @@
             </div>
 
             <label>Nom du lieu / Élément</label>
-            <input type="text" id="quickAddName" placeholder="Ex: Visite du Musée / Restaurant du Port">
+            <div class="search-input-wrapper">
+                <input type="text" id="quickAddName" placeholder="Ex: Visite du Musée..." oninput="handleModalLiveSearch(this.value, 'quickAddModalResults', selectQuickAddAddress)">
+                <button type="button" class="clear-btn" onclick="clearSearchInput('quickAddName', 'quickAddModalResults')">✕</button>
+            </div>
+            <div id="quickAddModalResults" class="modal-live-results"></div>
             
             <div class="grid-2">
                 <div>
