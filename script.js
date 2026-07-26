@@ -2,14 +2,12 @@ let activeDay = 1;
 let tripData = JSON.parse(localStorage.getItem('travelPlannerData')) || {};
 let hotelBookings = JSON.parse(localStorage.getItem('hotelBookings')) || [];
 let map;
-let itemMarkers = [];
+let mapMarkers = [];
 let searchMarker = null;
 let selectedTransportType = 'Train';
 let searchTimeout = null;
 
-const DAYS_SHORT = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
-
-// 1. INITIALISATION CARTE
+// 1. INITIALISATION DE LA CARTE
 function initMap(center = [46.3068, 4.8314], zoom = 7) {
     if(map) map.remove();
     map = L.map('map').setView(center, zoom);
@@ -47,6 +45,7 @@ window.onload = () => {
 
 function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
 
+// EFFACER LES CHAMPS D'INPUT (CROIX ✕)
 function clearSearchInput(inputId, resultsPanelId = null) {
     document.getElementById(inputId).value = '';
     if (resultsPanelId) {
@@ -54,17 +53,18 @@ function clearSearchInput(inputId, resultsPanelId = null) {
     }
 }
 
-// 2. RECHERCHE RAPIDE EN DIRECT / BOUTON / TOUCH ENTRÉE
-function handleSearchKeyDown(e) {
+// 2. RECHERCHE EN DIRECT & TOUCHES (ENTRÉE + BOUTON)
+function handleSearchKeyPress(e) {
     if (e.key === 'Enter') {
-        e.preventDefault();
         triggerManualSearch();
     }
 }
 
 function triggerManualSearch() {
-    const query = document.getElementById('wanderQuery').value.trim();
-    if (query) searchPlacesInApp(query);
+    const query = document.getElementById('wanderQuery').value;
+    if (query.trim()) {
+        searchPlacesInApp(query.trim());
+    }
 }
 
 function handleLiveSearch(query) {
@@ -85,7 +85,7 @@ async function searchPlacesInApp(query) {
     const panel = document.getElementById('search-results-panel');
     const list = document.getElementById('results-list');
     panel.style.display = 'block';
-    list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">🔍 Recherche...</div>`;
+    list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">🔍 Recherche en cours...</div>`;
 
     try {
         const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
@@ -94,7 +94,7 @@ async function searchPlacesInApp(query) {
 
         list.innerHTML = "";
         if (!data || data.length === 0) {
-            list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">Aucun résultat.<br><button class="btn-main btn-primary" style="margin-top:5px; font-size:0.75rem;" onclick="openQuickAddModal('activ', '${query.replace(/'/g, "\\'")}')">Ajouter manuellement</button></div>`;
+            list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">Aucun résultat trouvé.<br><button class="btn-main btn-primary" style="margin-top:5px; font-size:0.75rem;" onclick="openQuickAddModal('activ', '${query.replace(/'/g, "\\'")}')">Ajouter manuellement</button></div>`;
             return;
         }
 
@@ -116,14 +116,14 @@ async function searchPlacesInApp(query) {
                     <strong>${title}</strong>
                     <div style="font-size:0.7rem; color:var(--text-muted);">${sub}</div>
                 </div>
-                <button class="btn-main btn-primary" style="padding:4px 8px; font-size:0.75rem;" onclick="addBlockFromSearch('${title.replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">Ajouter</button>
+                <button class="btn-main btn-primary" style="padding:4px 8px; font-size:0.75rem;" onclick="addBlockFromSearch('${title.replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">Sélectionner</button>
             `;
             list.appendChild(div);
         });
 
     } catch(e) {
         console.error(e);
-        list.innerHTML = `<div style="font-size:0.8rem; color:red; padding:5px;">Erreur de recherche.</div>`;
+        list.innerHTML = `<div style="font-size:0.8rem; color:red; padding:5px;">Erreur lors de la recherche.</div>`;
     }
 }
 
@@ -134,7 +134,7 @@ function addBlockFromSearch(name, lat, lon) {
 
 function closeResults() { document.getElementById('search-results-panel').style.display = 'none'; }
 
-// RECHERCHE AUTOCOMPLÉTÉE MODALE
+// RECHERCHE AUTOCOMPLÉTÉE DANS LES MODALES
 function handleModalLiveSearch(query, resultsContainerId, selectCallback) {
     clearTimeout(searchTimeout);
     const container = document.getElementById(resultsContainerId);
@@ -183,6 +183,7 @@ function selectQuickAddAddress(name, lat, lon, containerId) {
     document.getElementById(containerId).style.display = 'none';
 }
 
+// 3. BASCOLATION DYNAMIQUE VERS LA BONNE MODALE
 function handleCategoryChange(selectedCategory) {
     const currentName = document.getElementById('quickAddName').value;
     const currentLat = document.getElementById('quickAddLat').value;
@@ -197,7 +198,7 @@ function handleCategoryChange(selectedCategory) {
     }
 }
 
-// 3. TIMELINE AVEC JOURS DE LA SEMAINE ABRÉGÉS (Lun, Mar, ...)
+// 4. TIMELINE ET ITINÉRAIRE (AVEC JOURS ABRÉGÉS)
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -216,10 +217,14 @@ function generateTimeline() {
         let currentDayNum = d;
         item.onclick = () => { activeDay = currentDayNum; updateDayTitle(); generateTimeline(); };
         
-        const dayOfWeek = DAYS_SHORT[curr.getDay()];
+        // Nom du jour abrégé (lun., mar., etc.)
+        const weekdayStr = curr.toLocaleDateString('fr-FR', { weekday: 'short' });
         const dateStr = curr.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
         
-        item.innerHTML = `<strong style="color:var(--accent);">${dayOfWeek} J${d}</strong> <small>(${dateStr})</small>`;
+        // Capitaliser la première lettre du jour (ex: Lun.)
+        const formattedWeekday = weekdayStr.charAt(0).toUpperCase() + weekdayStr.slice(1);
+
+        item.innerHTML = `<strong style="color:var(--accent);">Jour ${d}</strong> <small>(${formattedWeekday} ${dateStr})</small>`;
         area.appendChild(item);
         curr.setDate(curr.getDate() + 1); 
         d++;
@@ -243,27 +248,39 @@ function populateDaySelector() {
     }
 }
 
-// 4. GESTION DES MODALES D'AJOUT ET MODIFICATION
-function openHotelModal(defaultName = '', lat = null, lon = null) {
-    document.getElementById('hotelName').value = defaultName;
-    document.getElementById('hotelLat').value = lat || '';
-    document.getElementById('hotelLon').value = lon || '';
+// 5. MODALE HÔTEL (AJOUT ET ÉDITION)
+function openHotelModal(defaultName = '', lat = null, lon = null, bookingObj = null) {
+    if (bookingObj) {
+        document.getElementById('editingBookingId').value = bookingObj.id;
+        document.getElementById('hotelName').value = bookingObj.name;
+        document.getElementById('hotelStart').value = bookingObj.start;
+        document.getElementById('hotelEnd').value = bookingObj.end;
+        document.getElementById('hotelPrice').value = bookingObj.totalPrice;
+        document.getElementById('hotelLat').value = bookingObj.lat || '';
+        document.getElementById('hotelLon').value = bookingObj.lon || '';
+        document.getElementById('hotelModalTitle').innerText = "✏️ Modifier l'Hébergement";
+    } else {
+        document.getElementById('editingBookingId').value = '';
+        document.getElementById('hotelName').value = defaultName;
+        document.getElementById('hotelLat').value = lat || '';
+        document.getElementById('hotelLon').value = lon || '';
+        document.getElementById('hotelModalTitle').innerText = "🏨 Ajouter un Hébergement";
 
-    const startDateInput = document.getElementById('dateStart').value;
-    if (startDateInput) {
-        let d = new Date(startDateInput);
-        d.setDate(d.getDate() + (activeDay - 1));
-        const formattedDate = d.toISOString().split('T')[0];
-        document.getElementById('hotelStart').value = formattedDate;
-        
-        d.setDate(d.getDate() + 1);
-        document.getElementById('hotelEnd').value = d.toISOString().split('T')[0];
+        const startDateInput = document.getElementById('dateStart').value;
+        if (startDateInput) {
+            let d = new Date(startDateInput);
+            d.setDate(d.getDate() + (activeDay - 1));
+            document.getElementById('hotelStart').value = d.toISOString().split('T')[0];
+            d.setDate(d.getDate() + 1);
+            document.getElementById('hotelEnd').value = d.toISOString().split('T')[0];
+        }
     }
 
     document.getElementById('hotelModal').style.display = 'flex';
 }
 
 function saveHotel() {
+    const editingId = document.getElementById('editingBookingId').value;
     const name = document.getElementById('hotelName').value || 'Hôtel';
     const start = document.getElementById('hotelStart').value;
     const end = document.getElementById('hotelEnd').value;
@@ -272,13 +289,17 @@ function saveHotel() {
     const lat = parseFloat(document.getElementById('hotelLat').value) || null;
     const lon = parseFloat(document.getElementById('hotelLon').value) || null;
 
-    if (!start || !end) { alert("Indiquez les dates de début et de fin."); return; }
+    if (!start || !end) { alert("Indiquez la date de début et de fin !"); return; }
+
+    if (editingId) {
+        delB(null, parseInt(editingId));
+    }
 
     const startDate = new Date(start);
     const endDate = new Date(end);
     const tripStart = new Date(document.getElementById('dateStart').value || Date.now());
 
-    const bookingId = Date.now();
+    const bookingId = editingId ? parseInt(editingId) : Date.now();
     const totalNights = Math.max(1, Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)));
     const pricePerNight = price / totalNights;
 
@@ -316,20 +337,32 @@ function saveHotel() {
     save();
 }
 
+// 6. TRANSPORTS (AJOUT ET ÉDITION)
 function toggleTransportMenu() {
     const menu = document.getElementById('transportMenu');
     menu.style.display = menu.style.display === 'none' ? 'grid' : 'none';
 }
 
-function openTransportModal(type = 'Train', icon = '🚆', destinationName = '') {
-    selectedTransportType = type;
-    document.getElementById('transportModalTitle').innerText = `${icon} Transport (${type})`;
+function openTransportModal(type = 'Train', icon = '🚆', destinationName = '', itemObj = null) {
     document.getElementById('transportMenu').style.display = 'none';
-    if (destinationName) document.getElementById('transTo').value = destinationName;
+
+    if (itemObj) {
+        document.getElementById('editingTransportId').value = itemObj.id;
+        document.getElementById('transCost').value = itemObj.price;
+        document.getElementById('transPayer').value = itemObj.paidBy || 'Moi';
+        document.getElementById('transportModalTitle').innerText = "✏️ Modifier le Transport";
+    } else {
+        selectedTransportType = type;
+        document.getElementById('editingTransportId').value = '';
+        document.getElementById('transportModalTitle').innerText = `${icon} Ajouter un Transport (${type})`;
+        if (destinationName) document.getElementById('transTo').value = destinationName;
+    }
+
     document.getElementById('transportModal').style.display = 'flex';
 }
 
 function saveTransport() {
+    const editingId = document.getElementById('editingTransportId').value;
     const from = document.getElementById('transFrom').value || 'Départ';
     const to = document.getElementById('transTo').value || 'Arrivée';
     const dateStart = document.getElementById('transDateStart').value;
@@ -340,9 +373,13 @@ function saveTransport() {
 
     let icon = selectedTransportType === 'Ferry' ? '⛴️' : selectedTransportType === 'Bus' ? '🚌' : selectedTransportType === 'Avion' ? '✈️' : '🚆';
 
+    if (editingId) {
+        tripData[activeDay] = tripData[activeDay].filter(x => x.id !== parseFloat(editingId));
+    }
+
     if (!tripData[activeDay]) tripData[activeDay] = [];
     tripData[activeDay].push({
-        id: Date.now(),
+        id: editingId ? parseFloat(editingId) : Date.now(),
         type: 'vol',
         name: `${icon} ${selectedTransportType}: ${from} ➔ ${to}`,
         price: cost,
@@ -356,21 +393,38 @@ function saveTransport() {
     save();
 }
 
-function openQuickAddModal(defaultType = 'activ', name = '', lat = null, lon = null) {
+// 7. MODALE GÉNÉRIQUE (AJOUT ET ÉDITION)
+function openQuickAddModal(defaultType = 'activ', name = '', lat = null, lon = null, itemObj = null) {
     if (defaultType === 'hotel') {
         openHotelModal(name, lat, lon);
         return;
     }
 
     populateDaySelector();
-    document.getElementById('quickAddType').value = defaultType;
-    document.getElementById('quickAddName').value = name;
-    document.getElementById('quickAddLat').value = lat || '';
-    document.getElementById('quickAddLon').value = lon || '';
+
+    if (itemObj) {
+        document.getElementById('editingItemId').value = itemObj.id;
+        document.getElementById('quickAddType').value = itemObj.type;
+        document.getElementById('quickAddName').value = itemObj.name.replace(/^(🏨|🚆|🎟️|🍴)\s*/, '');
+        document.getElementById('quickAddPrice').value = itemObj.price;
+        document.getElementById('quickAddTime').value = itemObj.time || '12:00';
+        document.getElementById('quickAddLat').value = itemObj.lat || '';
+        document.getElementById('quickAddLon').value = itemObj.lon || '';
+        document.getElementById('quickAddTitle').innerText = "✏️ Modifier l'événement";
+    } else {
+        document.getElementById('editingItemId').value = '';
+        document.getElementById('quickAddType').value = defaultType;
+        document.getElementById('quickAddName').value = name;
+        document.getElementById('quickAddLat').value = lat || '';
+        document.getElementById('quickAddLon').value = lon || '';
+        document.getElementById('quickAddTitle').innerText = "Ajouter un événement";
+    }
+
     document.getElementById('quickAddModal').style.display = 'flex';
 }
 
 function saveQuickAdd() {
+    const editingId = document.getElementById('editingItemId').value;
     const targetDay = parseInt(document.getElementById('quickAddDaySelect').value) || activeDay;
     const type = document.getElementById('quickAddType').value;
     let name = document.getElementById('quickAddName').value || 'Élément';
@@ -390,9 +444,15 @@ function saveQuickAdd() {
         name = (icons[type] || '') + name;
     }
 
+    if (editingId) {
+        Object.keys(tripData).forEach(d => {
+            tripData[d] = tripData[d].filter(x => x.id !== parseFloat(editingId));
+        });
+    }
+
     if (!tripData[targetDay]) tripData[targetDay] = [];
     tripData[targetDay].push({
-        id: Date.now(),
+        id: editingId ? parseFloat(editingId) : Date.now(),
         type,
         name,
         price,
@@ -407,81 +467,9 @@ function saveQuickAdd() {
     save();
 }
 
-// MODAL D'ÉDITION D'UN ÉVÉNEMENT
-function openEditModal(id, day, bookingId = null) {
-    if (bookingId) {
-        const booking = hotelBookings.find(b => b.id === bookingId);
-        if (booking) {
-            document.getElementById('editId').value = booking.id;
-            document.getElementById('editDay').value = day;
-            document.getElementById('editBookingId').value = bookingId;
-            document.getElementById('editName').value = booking.name;
-            document.getElementById('editPrice').value = booking.totalPrice;
-            document.getElementById('editTime').value = "15:00";
-            document.getElementById('editPaidBy').value = "Moi";
-            document.getElementById('editNotes').value = `Hébergement (${booking.start} au ${booking.end})`;
-        }
-    } else {
-        const item = (tripData[day] || []).find(x => x.id === id);
-        if (item) {
-            document.getElementById('editId').value = item.id;
-            document.getElementById('editDay').value = day;
-            document.getElementById('editBookingId').value = "";
-            document.getElementById('editName').value = item.name;
-            document.getElementById('editPrice').value = item.price;
-            document.getElementById('editTime').value = item.time || "12:00";
-            document.getElementById('editPaidBy').value = item.paidBy || "Moi";
-            document.getElementById('editNotes').value = item.notes || "";
-        }
-    }
-    document.getElementById('editModal').style.display = 'flex';
-}
-
-function saveEdit() {
-    const id = parseFloat(document.getElementById('editId').value);
-    const day = parseInt(document.getElementById('editDay').value);
-    const bookingId = document.getElementById('editBookingId').value ? parseFloat(document.getElementById('editBookingId').value) : null;
-    
-    const newName = document.getElementById('editName').value;
-    const newPrice = parseFloat(document.getElementById('editPrice').value) || 0;
-    const newTime = document.getElementById('editTime').value;
-    const newPaidBy = document.getElementById('editPaidBy').value;
-    const newNotes = document.getElementById('editNotes').value;
-
-    if (bookingId) {
-        let booking = hotelBookings.find(b => b.id === bookingId);
-        if (booking) {
-            booking.name = newName;
-            booking.totalPrice = newPrice;
-        }
-        // Mise à jour des sous-blocs correspondants
-        Object.keys(tripData).forEach(d => {
-            tripData[d].forEach(item => {
-                if (item.bookingId === bookingId) {
-                    item.name = `🏨 ${newName}`;
-                    item.paidBy = newPaidBy;
-                }
-            });
-        });
-    } else {
-        let item = (tripData[day] || []).find(x => x.id === id);
-        if (item) {
-            item.name = newName;
-            item.price = newPrice;
-            item.time = newTime;
-            item.paidBy = newPaidBy;
-            item.notes = newNotes;
-        }
-    }
-
-    closeModal('editModal');
-    renderBlocks();
-    save();
-}
-
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-// 5. RENDU PLANNING ET SYNTHÈSE AVEC OPTION D'ÉDITION
+// 8. RENDU DU PLANNING ET BOUTONS DE MODIFICATION
 function renderBlocks() {
     const list = document.getElementById('blocksList');
     list.innerHTML = "";
@@ -493,10 +481,10 @@ function renderBlocks() {
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <strong style="font-size:0.85rem;">${b.name}</strong>
-                <div class="block-actions">
-                    <span style="font-weight:bold; color:var(--accent); margin-right:4px;">${b.price.toFixed(2)}${cur}</span>
-                    <button class="btn-icon" onclick="openEditModal(${b.id}, ${activeDay}, ${b.bookingId || 'null'})" title="Modifier">✏️</button>
-                    <button class="btn-icon" onclick="delB(${b.id}, ${b.bookingId || 'null'})" title="Supprimer">✕</button>
+                <div>
+                    <span style="font-weight:bold; color:var(--accent);">${b.price.toFixed(2)}${cur}</span>
+                    <button class="action-btn" onclick="editItem(${b.id})" title="Modifier">✏️</button>
+                    <button class="action-btn" onclick="delB(${b.id}, ${b.bookingId || 'null'})" title="Supprimer">✕</button>
                 </div>
             </div>
             <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
@@ -510,6 +498,27 @@ function renderBlocks() {
     updateTotal();
     updateMapMarkers();
     renderCategoriesRecap();
+}
+
+function editItem(itemId) {
+    let foundItem = null;
+    let itemDay = null;
+
+    Object.entries(tripData).forEach(([dayNum, items]) => {
+        let item = items.find(x => x.id === itemId);
+        if (item) { foundItem = item; itemDay = dayNum; }
+    });
+
+    if (!foundItem) return;
+
+    if (foundItem.bookingId) {
+        let booking = hotelBookings.find(b => b.id === foundItem.bookingId);
+        if (booking) openHotelModal('', null, null, booking);
+    } else if (foundItem.type === 'vol') {
+        openTransportModal('Transport', '🚆', '', foundItem);
+    } else {
+        openQuickAddModal(foundItem.type, '', null, null, foundItem);
+    }
 }
 
 function updateTotal() {
@@ -527,6 +536,47 @@ function updateTotal() {
     document.getElementById('perPaxLabel').innerText = perPax.toFixed(2) + cur;
 }
 
+// 9. AFFICHAGE DE TOUS LES POINTS SUR LA CARTE + LIENS NAVIGATION GPS (GOOGLE, WAZE, APPLE)
+function updateMapMarkers() {
+    mapMarkers.forEach(m => map.removeLayer(m));
+    mapMarkers = [];
+
+    Object.entries(tripData).forEach(([dayNum, items]) => {
+        const isCurrentDay = parseInt(dayNum) === activeDay;
+
+        items.forEach(b => {
+            if (b.lat && b.lon) {
+                // URLs pour la navigation web & applications mobiles
+                const googleUrl = `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lon}`;
+                const wazeUrl = `https://waze.com/ul?ll=${b.lat},${b.lon}&navigate=yes`;
+                const appleUrl = `https://maps.apple.com/?daddr=${b.lat},${b.lon}`;
+
+                const popupContent = `
+                    <div style="font-size:0.85rem;">
+                        <strong>${b.name}</strong> <small>(J${dayNum})</small><br>
+                        <div class="gps-btn-group">
+                            <a href="${googleUrl}" target="_blank" class="gps-btn gps-google">Google</a>
+                            <a href="${wazeUrl}" target="_blank" class="gps-btn gps-waze">Waze</a>
+                            <a href="${appleUrl}" target="_blank" class="gps-btn gps-apple">Plan</a>
+                        </div>
+                    </div>
+                `;
+
+                let marker = L.marker([b.lat, b.lon], {
+                    opacity: isCurrentDay ? 1.0 : 0.45
+                }).addTo(map).bindPopup(popupContent);
+
+                if (isCurrentDay) {
+                    marker.openPopup();
+                }
+
+                mapMarkers.push(marker);
+            }
+        });
+    });
+}
+
+// 10. SYNTHÈSE DES CATÉGORIES AVEC BOUTON DE MODIFICATION ✏️
 function renderCategoriesRecap() {
     const categories = { vol: [], activ: [], resto: [] };
     const cur = document.getElementById('currency').value;
@@ -539,7 +589,7 @@ function renderCategoriesRecap() {
         });
     });
 
-    // 1. Catégorie Hébergements
+    // 1. Hébergements
     const hotelContainer = document.getElementById('cat-list-hotel');
     hotelContainer.innerHTML = "";
     if (hotelBookings.length === 0) {
@@ -549,12 +599,12 @@ function renderCategoriesRecap() {
             let div = document.createElement('div');
             div.className = 'cat-item';
             div.innerHTML = `
-                <div class="cat-item-content" onclick="goToDay(${booking.startDay}, ${booking.lat}, ${booking.lon})">
+                <div class="cat-item-info" onclick="jumpToDay(${booking.startDay}, ${booking.lat}, ${booking.lon})">
                     <span>🏨 ${booking.name} <small style="color:var(--text-muted);">(du ${booking.start} au ${booking.end})</small></span>
                 </div>
                 <div>
                     <strong style="margin-right:6px;">${booking.totalPrice.toFixed(0)}${cur}</strong>
-                    <button class="btn-icon" onclick="openEditModal(null, ${booking.startDay}, ${booking.id})">✏️</button>
+                    <button class="action-btn" onclick="openHotelModal('', null, null, ${JSON.stringify(booking).replace(/"/g, '&quot;')})">✏️</button>
                 </div>
             `;
             hotelContainer.appendChild(div);
@@ -575,12 +625,12 @@ function renderCategoriesRecap() {
             let div = document.createElement('div');
             div.className = 'cat-item';
             div.innerHTML = `
-                <div class="cat-item-content" onclick="goToDay(${item.dayNum}, ${item.lat}, ${item.lon})">
+                <div class="cat-item-info" onclick="jumpToDay(${item.dayNum}, ${item.lat}, ${item.lon})">
                     <span>${item.name} <small style="color:var(--text-muted);">(J${item.dayNum})</small></span>
                 </div>
                 <div>
                     <strong style="margin-right:6px;">${item.price.toFixed(0)}${cur}</strong>
-                    <button class="btn-icon" onclick="openEditModal(${item.id}, ${item.dayNum})">✏️</button>
+                    <button class="action-btn" onclick="editItem(${item.id})">✏️</button>
                 </div>
             `;
             catContainer.appendChild(div);
@@ -588,40 +638,10 @@ function renderCategoriesRecap() {
     });
 }
 
-function goToDay(dayNum, lat = null, lon = null) {
+function jumpToDay(dayNum, lat = null, lon = null) {
     activeDay = parseInt(dayNum) || 1;
     generateTimeline();
     if (lat && lon) map.setView([lat, lon], 14);
-}
-
-// 6. AFFICHAGE DE TOUS LES POINTS SUR LA CARTE + LIENS DE NAVIGATION (GOOGLE/APPLE/WAZE)
-function updateMapMarkers() {
-    itemMarkers.forEach(m => map.removeLayer(m));
-    itemMarkers = [];
-
-    Object.entries(tripData).forEach(([dayNum, items]) => {
-        items.forEach(b => {
-            if (b.lat && b.lon) {
-                const title = encodeURIComponent(b.name.replace(/^(🏨|🚆|🎟️|🍴)\s*/, ''));
-                const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lon}`;
-                const appleUrl = `https://maps.apple.com/?q=${title}&ll=${b.lat},${b.lon}`;
-                const wazeUrl = `https://waze.com/ul?ll=${b.lat},${b.lon}&navigate=yes`;
-
-                let popupContent = `
-                    <div style="font-size:0.8rem; font-weight:bold;">${b.name}</div>
-                    <div style="font-size:0.7rem; color:gray;">Jour ${dayNum} - ${b.time}</div>
-                    <div class="map-popup-actions">
-                        <a href="${gmapsUrl}" target="_blank" class="map-popup-btn btn-gmaps">Google</a>
-                        <a href="${appleUrl}" target="_blank" class="map-popup-btn btn-apple">Apple</a>
-                        <a href="${wazeUrl}" target="_blank" class="map-popup-btn btn-waze">Waze</a>
-                    </div>
-                `;
-
-                let m = L.marker([b.lat, b.lon]).addTo(map).bindPopup(popupContent);
-                itemMarkers.push(m);
-            }
-        });
-    });
 }
 
 function delB(id, bookingId = null) {
