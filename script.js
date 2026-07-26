@@ -122,10 +122,33 @@ const i18n = {
     }
 };
 
+// HELPER: FORMATEUR DE DATES (JJ/MM/AAAA vs MM/JJ/AAAA)
+function formatDateString(dateInput) {
+    if (!dateInput) return '';
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return '';
+    
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    return currentLang === 'fr' ? `${day}/${month}/${year}` : `${month}/${day}/${year}`;
+}
+
+// HELPER: OBTENIR LA DATE EXACTE À PARTIR DU NUMÉRO DE JOUR
+function getDateForDayNumber(dayNum) {
+    const startDateInput = document.getElementById('dateStart').value;
+    if (!startDateInput) return null;
+    let d = new Date(startDateInput);
+    d.setDate(d.getDate() + (dayNum - 1));
+    return d;
+}
+
 function toggleLang() {
     currentLang = currentLang === 'fr' ? 'en' : 'fr';
     applyLanguage();
     generateTimeline();
+    renderCategoriesRecap();
 }
 
 function applyLanguage() {
@@ -340,7 +363,7 @@ function handleCategoryChange(selectedCategory) {
     }
 }
 
-// 3. TIMELINE (RESTITUÉE SELON EXIGENCES : J1 ven. 28 août)
+// 3. TIMELINE
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -391,11 +414,15 @@ function populateDaySelector() {
     }
 }
 
-// 4. HÔTEL ET TRANSPORTS
+// 4. HÔTEL ET TRANSPORTS (RÉINITIALISATION CHAMPS AVANT OUVERTURE)
 function openHotelModal(defaultName = '', lat = null, lon = null) {
+    // Réinitialisation des anciens champs
     document.getElementById('hotelName').value = defaultName;
+    document.getElementById('hotelPrice').value = '';
+    document.getElementById('hotelPayer').value = 'Moi';
     document.getElementById('hotelLat').value = lat || '';
     document.getElementById('hotelLon').value = lon || '';
+    document.getElementById('hotelModalResults').style.display = 'none';
 
     const startDateInput = document.getElementById('dateStart').value;
     if (startDateInput) {
@@ -406,6 +433,9 @@ function openHotelModal(defaultName = '', lat = null, lon = null) {
         
         d.setDate(d.getDate() + 1);
         document.getElementById('hotelEnd').value = d.toISOString().split('T')[0];
+    } else {
+        document.getElementById('hotelStart').value = '';
+        document.getElementById('hotelEnd').value = '';
     }
 
     document.getElementById('hotelModal').style.display = 'flex';
@@ -455,7 +485,7 @@ function saveHotel() {
                 name: `🏨 ${name}`,
                 price: pricePerNight,
                 time: '15:00',
-                notes: `Nuitée (${start} au ${end})`,
+                notes: `Nuitée (${formatDateString(start)} au ${formatDateString(end)})`,
                 paidBy: payer,
                 lat, lon
             });
@@ -477,7 +507,17 @@ function openTransportModal(type = 'Train', icon = '🚆', destinationName = '')
     selectedTransportType = type;
     document.getElementById('transportModalTitle').innerText = `${icon} Transport (${type})`;
     document.getElementById('transportMenu').style.display = 'none';
-    if (destinationName) document.getElementById('transTo').value = destinationName;
+
+    // Réinitialisation des champs
+    document.getElementById('transFrom').value = '';
+    document.getElementById('transTo').value = destinationName || '';
+    document.getElementById('transDateStart').value = '';
+    document.getElementById('transDateEnd').value = '';
+    document.getElementById('transCompany').value = '';
+    document.getElementById('transCode').value = '';
+    document.getElementById('transCost').value = '';
+    document.getElementById('transPayer').value = 'Moi';
+
     document.getElementById('transportModal').style.display = 'flex';
 }
 
@@ -515,10 +555,16 @@ function openQuickAddModal(defaultType = 'activ', name = '', lat = null, lon = n
     }
 
     populateDaySelector();
+    
+    // Réinitialisation des anciens champs
     document.getElementById('quickAddType').value = defaultType;
-    document.getElementById('quickAddName').value = name;
+    document.getElementById('quickAddName').value = name || '';
+    document.getElementById('quickAddPrice').value = '';
+    document.getElementById('quickAddTime').value = '12:00';
     document.getElementById('quickAddLat').value = lat || '';
     document.getElementById('quickAddLon').value = lon || '';
+    document.getElementById('quickAddModalResults').style.display = 'none';
+
     document.getElementById('quickAddModal').style.display = 'flex';
 }
 
@@ -572,7 +618,7 @@ function openEditModal(id, day, bookingId = null) {
             document.getElementById('editPrice').value = booking.totalPrice;
             document.getElementById('editTime').value = "15:00";
             document.getElementById('editPaidBy').value = booking.paidBy || "Moi";
-            document.getElementById('editNotes').value = `Hébergement (${booking.start} au ${booking.end})`;
+            document.getElementById('editNotes').value = `Hébergement (${formatDateString(booking.start)} au ${formatDateString(booking.end)})`;
         }
     } else {
         const item = (tripData[day] || []).find(x => x.id === id);
@@ -631,7 +677,7 @@ function saveEdit() {
 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-// 6. RENDU ET SYNTHÈSE
+// 6. RENDU ET SYNTHÈSE (AVEC TRI CHRONOLOGIQUE ET FORMATAGE DE DATE DÉDIÉ)
 function renderBlocks() {
     const list = document.getElementById('blocksList');
     list.innerHTML = "";
@@ -662,20 +708,17 @@ function renderBlocks() {
     renderCategoriesRecap();
 }
 
-// MISE À JOUR : CALCUL PAR PERSONNE ET RÉPARTITION
 function updateTotal() {
     let total = 0;
     const cur = document.getElementById('currency').value;
     const paxCount = Math.max(1, parseInt(document.getElementById('pax').value) || 1);
     const payerTotals = {};
 
-    // Traitement des hébergements globaux
     hotelBookings.forEach(booking => {
         const payer = booking.paidBy || 'Moi';
         payerTotals[payer] = (payerTotals[payer] || 0) + booking.totalPrice;
     });
 
-    // Traitement des éléments hors hébergements (évite les doublons)
     Object.values(tripData).forEach(dayBlocks => {
         dayBlocks.forEach(b => {
             if (b.type !== 'hotel') {
@@ -691,7 +734,6 @@ function updateTotal() {
     document.getElementById('totalLabel').innerText = total.toFixed(2) + cur;
     document.getElementById('perPaxLabel').innerText = perPax.toFixed(2) + cur;
 
-    // Rendu de la répartition dynamique
     const breakdownContainer = document.getElementById('payerBreakdownContainer');
     breakdownContainer.innerHTML = "";
 
@@ -705,29 +747,53 @@ function updateTotal() {
     }
 }
 
+// RENDU DE LA SYNTHÈSE : TRI CHRONOLOGIQUE ET FORMAT DE DATE AMÉLIORÉ
 function renderCategoriesRecap() {
     const categories = { vol: [], activ: [], resto: [] };
     const cur = document.getElementById('currency').value;
 
     Object.entries(tripData).forEach(([dayNum, items]) => {
+        const num = parseInt(dayNum);
         items.forEach(item => {
             if (item.type !== 'hotel' && categories[item.type]) {
-                categories[item.type].push({ ...item, dayNum });
+                const itemDate = getDateForDayNumber(num);
+                categories[item.type].push({ 
+                    ...item, 
+                    dayNum: num,
+                    dateObj: itemDate
+                });
             }
         });
     });
 
+    // --- 1. RENDU HÔTELS (TRIÉS PAR DATE DE DÉBUT) ---
     const hotelContainer = document.getElementById('cat-list-hotel');
     hotelContainer.innerHTML = "";
-    if (hotelBookings.length === 0) {
+    
+    // Tri par date
+    const sortedHotels = [...hotelBookings].sort((a, b) => new Date(a.start) - new Date(b.start));
+
+    if (sortedHotels.length === 0) {
         hotelContainer.innerHTML = `<small style="color:var(--text-muted); font-size:0.75rem; padding:4px;">Aucun hébergement</small>`;
     } else {
-        hotelBookings.forEach(booking => {
+        sortedHotels.forEach(booking => {
             let div = document.createElement('div');
             div.className = 'cat-item';
+            
+            const startDateFormatted = formatDateString(booking.start);
+            const endDateFormatted = formatDateString(booking.end);
+            
+            const datePrefix = currentLang === 'fr' ? 'Du' : 'From';
+            const dateTo = currentLang === 'fr' ? 'au' : 'to';
+            const dayPrefix = currentLang === 'fr' ? 'J' : 'Day ';
+            
+            const dayRangeStr = booking.startDay === booking.endDay 
+                ? `${dayPrefix}${booking.startDay}` 
+                : `${dayPrefix}${booking.startDay} ${currentLang === 'fr' ? 'à' : 'to'} ${dayPrefix}${booking.endDay}`;
+
             div.innerHTML = `
                 <div class="cat-item-content" onclick="goToDay(${booking.startDay}, ${booking.lat}, ${booking.lon})">
-                    <span>🏨 ${booking.name} <small style="color:var(--text-muted);">(du ${booking.start} au ${booking.end})</small></span>
+                    <span>🏨 ${booking.name} <br><small style="color:var(--text-muted);">${datePrefix} ${startDateFormatted} ${dateTo} ${endDateFormatted} (${dayRangeStr})</small></span>
                 </div>
                 <div>
                     <strong style="margin-right:6px;">${booking.totalPrice.toFixed(0)}${cur}</strong>
@@ -738,10 +804,20 @@ function renderCategoriesRecap() {
         });
     }
 
+    // --- 2. RENDU VOL, ACTIVITÉS, RESTAURANTS (TRIÉS PAR DATE + HEURE) ---
     ['vol', 'activ', 'resto'].forEach(cat => {
         const catContainer = document.getElementById(`cat-list-${cat}`);
         catContainer.innerHTML = "";
         
+        // Tri chronologique
+        categories[cat].sort((a, b) => {
+            const timeA = a.time || '00:00';
+            const timeB = b.time || '00:00';
+            const dateA = a.dateObj ? new Date(`${a.dateObj.toISOString().split('T')[0]}T${timeA}`) : 0;
+            const dateB = b.dateObj ? new Date(`${b.dateObj.toISOString().split('T')[0]}T${timeB}`) : 0;
+            return dateA - dateB;
+        });
+
         if (categories[cat].length === 0) {
             catContainer.innerHTML = `<small style="color:var(--text-muted); font-size:0.75rem; padding:4px;">Aucun élément</small>`;
             return;
@@ -750,9 +826,15 @@ function renderCategoriesRecap() {
         categories[cat].forEach(item => {
             let div = document.createElement('div');
             div.className = 'cat-item';
+
+            const dateStr = item.dateObj ? formatDateString(item.dateObj) : '';
+            const atStr = currentLang === 'fr' ? 'à' : 'at';
+            const dayTag = currentLang === 'fr' ? `J${item.dayNum}` : `Day ${item.dayNum}`;
+            const timeStr = item.time ? `${atStr} ${item.time}` : '';
+
             div.innerHTML = `
                 <div class="cat-item-content" onclick="goToDay(${item.dayNum}, ${item.lat}, ${item.lon})">
-                    <span>${item.name} <small style="color:var(--text-muted);">(J${item.dayNum})</small></span>
+                    <span>${item.name} <br><small style="color:var(--text-muted);">${dateStr} ${timeStr} (${dayTag})</small></span>
                 </div>
                 <div>
                     <strong style="margin-right:6px;">${item.price.toFixed(0)}${cur}</strong>
@@ -770,7 +852,7 @@ function goToDay(dayNum, lat = null, lon = null) {
     if (lat && lon) map.setView([lat, lon], 14);
 }
 
-// 7. POP-UP CARTE AMÉLIORÉE POUR LES SÉJOURS HÔTELS MULTI-JOURS
+// 7. POP-UP CARTE
 function updateMapMarkers() {
     itemMarkers.forEach(m => map.removeLayer(m));
     itemMarkers = [];
@@ -780,8 +862,6 @@ function updateMapMarkers() {
     Object.entries(tripData).forEach(([dayNum, items]) => {
         items.forEach(b => {
             if (b.lat && b.lon) {
-                
-                // Si hébergement multi-jours, éviter les doublons de marqueurs
                 if (b.bookingId) {
                     if (processedBookingIds.has(b.bookingId)) return;
                     processedBookingIds.add(b.bookingId);
