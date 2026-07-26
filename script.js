@@ -4,8 +4,9 @@ let map;
 let itemMarkers = [];
 let searchMarker = null;
 let selectedTransportType = 'Train';
+let searchTimeout = null;
 
-// 1. INITIALISATION DE LA CARTE AVEC CLIC DE PRÉCISION
+// 1. INITIALISATION DE LA CARTE
 function initMap(center = [46.3068, 4.8314], zoom = 7) {
     if(map) map.remove();
     map = L.map('map').setView(center, zoom);
@@ -13,14 +14,11 @@ function initMap(center = [46.3068, 4.8314], zoom = 7) {
         attribution: '&copy; OpenStreetMap' 
     }).addTo(map);
 
-    // Clic précis sur la carte
     map.on('click', async function(e) {
         const lat = e.latlng.lat;
         const lon = e.latlng.lng;
-        
         let placeName = `Lieu (${lat.toFixed(3)}, ${lon.toFixed(3)})`;
         
-        // Obtenir le nom exact par reverse geocoding
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`, {
                 headers: { 'User-Agent': 'TravelPlannerApp/1.0' }
@@ -29,9 +27,7 @@ function initMap(center = [46.3068, 4.8314], zoom = 7) {
             if (data && data.display_name) {
                 placeName = data.display_name.split(',')[0];
             }
-        } catch(err) {
-            console.error(err);
-        }
+        } catch(err) { console.error(err); }
 
         openQuickAddModal('activ', placeName, lat, lon);
     });
@@ -48,7 +44,132 @@ window.onload = () => {
 
 function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
 
-// 2. TIMELINE ET SÉLECTION DU JOUR
+// FONCTION POUR EFFACER LES CHAMPS D'INPUT (CROIX ✕)
+function clearSearchInput(inputId, resultsPanelId = null) {
+    document.getElementById(inputId).value = '';
+    if (resultsPanelId) {
+        document.getElementById(resultsPanelId).style.display = 'none';
+    }
+}
+
+// 2. RECHERCHE EN DIRECT AU FIL DE LA SAISIE (DEBOUNCE)
+function handleLiveSearch(query) {
+    clearTimeout(searchTimeout);
+    const panel = document.getElementById('search-results-panel');
+    
+    if (!query.trim()) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    searchTimeout = setTimeout(() => {
+        searchPlacesInApp(query.trim());
+    }, 300);
+}
+
+async function searchPlacesInApp(query) {
+    const panel = document.getElementById('search-results-panel');
+    const list = document.getElementById('results-list');
+    panel.style.display = 'block';
+    list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">🔍 Recherche...</div>`;
+
+    try {
+        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
+        const res = await fetch(searchUrl, { headers: { 'User-Agent': 'TravelPlannerApp/1.0' } });
+        const data = await res.json();
+
+        list.innerHTML = "";
+        if (!data || data.length === 0) {
+            list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">Aucun résultat.<br><button class="btn-main btn-primary" style="margin-top:5px; font-size:0.75rem;" onclick="openQuickAddModal('activ', '${query.replace(/'/g, "\\'")}')">Ajouter manuellement</button></div>`;
+            return;
+        }
+
+        const topResult = data[0];
+        const lat = parseFloat(topResult.lat);
+        const lon = parseFloat(topResult.lon);
+        
+        map.setView([lat, lon], 12);
+        if (searchMarker) map.removeLayer(searchMarker);
+        searchMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<b>${topResult.display_name.split(',')[0]}</b>`).openPopup();
+
+        data.forEach(place => {
+            let title = place.display_name.split(',')[0];
+            let sub = place.display_name.split(',').slice(1, 3).join(',');
+            let div = document.createElement('div');
+            div.className = "place-card-result";
+            div.innerHTML = `
+                <div>
+                    <strong>${title}</strong>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">${sub}</div>
+                </div>
+                <button class="btn-main btn-primary" style="padding:4px 8px; font-size:0.75rem;" onclick="addBlockFromSearch('${title.replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">Ajouter</button>
+            `;
+            list.appendChild(div);
+        });
+
+    } catch(e) {
+        console.error(e);
+        list.innerHTML = `<div style="font-size:0.8rem; color:red; padding:5px;">Erreur de recherche.</div>`;
+    }
+}
+
+function addBlockFromSearch(name, lat, lon) {
+    openQuickAddModal('activ', name, lat, lon);
+    closeResults();
+}
+
+function closeResults() { document.getElementById('search-results-panel').style.display = 'none'; }
+
+// RECHERCHE DANS LES MODALES AU FIL DE LA SAISIE
+function handleModalLiveSearch(query, resultsContainerId, selectCallback) {
+    clearTimeout(searchTimeout);
+    const container = document.getElementById(resultsContainerId);
+
+    if (!query.trim()) {
+        container.style.display = 'none';
+        return;
+    }
+
+    searchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=4`, {
+                headers: { 'User-Agent': 'TravelPlannerApp/1.0' }
+            });
+            const data = await res.json();
+
+            container.innerHTML = "";
+            if (data && data.length > 0) {
+                container.style.display = 'block';
+                data.forEach(place => {
+                    let title = place.display_name.split(',')[0];
+                    let div = document.createElement('div');
+                    div.className = 'modal-live-item';
+                    div.innerText = place.display_name;
+                    div.onclick = () => selectCallback(title, place.lat, place.lon, resultsContainerId);
+                    container.appendChild(div);
+                });
+            } else {
+                container.style.display = 'none';
+            }
+        } catch(e) { console.error(e); }
+    }, 300);
+}
+
+function selectHotelAddress(name, lat, lon, containerId) {
+    document.getElementById('hotelName').value = name;
+    document.getElementById('hotelLat').value = lat;
+    document.getElementById('hotelLon').value = lon;
+    document.getElementById(containerId).style.display = 'none';
+}
+
+function selectQuickAddAddress(name, lat, lon, containerId) {
+    document.getElementById('quickAddName').value = name;
+    document.getElementById('quickAddLat').value = lat;
+    document.getElementById('quickAddLon').value = lon;
+    document.getElementById(containerId).style.display = 'none';
+}
+
+// 3. TIMELINE & BLOCS
 function generateTimeline() {
     const startI = document.getElementById('dateStart').value;
     const endI = document.getElementById('dateEnd').value;
@@ -92,64 +213,6 @@ function populateDaySelector() {
     }
 }
 
-// 3. RECHERCHE ET RECENTRAGE DE LA CARTE
-async function searchPlacesInApp() {
-    const query = document.getElementById('wanderQuery').value.trim();
-    if (!query) return;
-
-    const panel = document.getElementById('search-results-panel');
-    const list = document.getElementById('results-list');
-    panel.style.display = 'block';
-    list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">🔍 Recherche...</div>`;
-
-    try {
-        const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
-        const res = await fetch(searchUrl, { headers: { 'User-Agent': 'TravelPlannerApp/1.0' } });
-        const data = await res.json();
-
-        list.innerHTML = "";
-        if (!data || data.length === 0) {
-            list.innerHTML = `<div style="font-size:0.8rem; padding:5px;">Aucun résultat.<br><button class="btn-main btn-primary" style="margin-top:5px; font-size:0.75rem;" onclick="openQuickAddModal('activ', '${query.replace(/'/g, "\\'")}')">Ajouter manuellement</button></div>`;
-            return;
-        }
-
-        const topResult = data[0];
-        const lat = parseFloat(topResult.lat);
-        const lon = parseFloat(topResult.lon);
-        
-        map.setView([lat, lon], 12);
-
-        if (searchMarker) map.removeLayer(searchMarker);
-        searchMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<b>${topResult.display_name.split(',')[0]}</b>`).openPopup();
-
-        data.forEach(place => {
-            let title = place.display_name.split(',')[0];
-            let sub = place.display_name.split(',').slice(1, 3).join(',');
-            let div = document.createElement('div');
-            div.className = "place-card-result";
-            div.innerHTML = `
-                <div>
-                    <strong>${title}</strong>
-                    <div style="font-size:0.7rem; color:var(--text-muted);">${sub}</div>
-                </div>
-                <button class="btn-main btn-primary" style="padding:4px 8px; font-size:0.75rem;" onclick="addBlockFromSearch('${title.replace(/'/g, "\\'")}', ${place.lat}, ${place.lon})">Ajouter</button>
-            `;
-            list.appendChild(div);
-        });
-
-    } catch(e) {
-        console.error(e);
-        list.innerHTML = `<div style="font-size:0.8rem; color:red; padding:5px;">Erreur de connexion.</div>`;
-    }
-}
-
-function addBlockFromSearch(name, lat, lon) {
-    openQuickAddModal('activ', name, lat, lon);
-    closeResults();
-}
-
-function closeResults() { document.getElementById('search-results-panel').style.display = 'none'; }
-
 // 4. HÔTEL MULTI-JOURS
 function openHotelModal() { document.getElementById('hotelModal').style.display = 'flex'; }
 
@@ -159,6 +222,8 @@ function saveHotel() {
     const end = document.getElementById('hotelEnd').value;
     const price = parseFloat(document.getElementById('hotelPrice').value) || 0;
     const payer = document.getElementById('hotelPayer').value || 'Moi';
+    const lat = parseFloat(document.getElementById('hotelLat').value) || null;
+    const lon = parseFloat(document.getElementById('hotelLon').value) || null;
 
     if (!start || !end) { alert("Indiquez la date de début et de fin !"); return; }
 
@@ -181,7 +246,8 @@ function saveHotel() {
                 price: pricePerNight,
                 time: '15:00',
                 notes: `Nuitée (${start} au ${end})`,
-                paidBy: payer
+                paidBy: payer,
+                lat, lon
             });
         }
         curr.setDate(curr.getDate() + 1);
@@ -232,7 +298,7 @@ function saveTransport() {
     save();
 }
 
-// 6. AJOUT EN UN CLIC
+// 6. AJOUT RAPIDE / UNIFIÉ
 function openQuickAddModal(defaultType = 'activ', name = '', lat = null, lon = null) {
     populateDaySelector();
     document.getElementById('quickAddType').value = defaultType;
@@ -275,7 +341,7 @@ function saveQuickAdd() {
 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-// 7. CALCUL DU BUDGET TOTAL & PAR PERSONNE
+// 7. RENDU ET CALCULS
 function renderBlocks() {
     const list = document.getElementById('blocksList');
     list.innerHTML = "";
